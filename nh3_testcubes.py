@@ -143,6 +143,8 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
                                                  xoff_v=V2))
             cube11[:, yy, xx] = spec11
             cube22[:, yy, xx] = spec22
+            Tmax11 = np.max(cube11[:, nBorder, nBorder])
+            Tmax22 = np.max(cube22[:, nBorder, nBorder])
             cube11 += np.random.randn(*cube11.shape) * noise_rms
             cube22 += np.random.randn(*cube22.shape) * noise_rms
         hdu11 = fits.PrimaryHDU(cube11)
@@ -152,6 +154,8 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
                                          Voff1[i], Voff2[i], Width1[i], Width2[i],
                                          Temp1[i], Temp2[i]]):
                 hdu11.header[kk] = vv
+        hdu11.header['TMAX'] = Tmax11
+        hdu11.header['RMS'] = noise_rms
         hdu11.header['CRVAL3'] = 23694495500.0
         hdu11.header['RESTFRQ'] = 23694495500.0
         hdu11.writeto(output_dir + '/random_cube_NH3_11_'
@@ -165,6 +169,8 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
                                          Voff1[i], Voff2[i], Width1[i], Width2[i],
                                          Temp1[i], Temp2[i]]):
                 hdu22.header[kk] = vv
+        hdu22.header['TMAX'] = Tmax22
+        hdu22.header['RMS'] = noise_rms
         hdu22.header['CRVAL3'] = 23722633600.0
         hdu22.header['RESTFRQ'] = 23722633600.0
         hdu22.writeto(output_dir + '/random_cube_NH3_22_'
