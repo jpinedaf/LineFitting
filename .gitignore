@@ -1,7 +1,10 @@
-# Byte-compiled / optimized / DLL files
+n# Byte-compiled / optimized / DLL file2
 __pycache__/
 *.py[cod]
 *$py.class
+
+#Jupyter notebooks
+.ipynb_checkpoints/
 
 # C extensions
 *.so
