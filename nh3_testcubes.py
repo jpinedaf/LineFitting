@@ -48,6 +48,14 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
 
     Width1 = np.sqrt(Width1NT + 0.08**2)
     Width2 = np.sqrt(Width2NT + 0.08**2)
+    
+    # Find where centroids are too close
+    too_close = np.where(np.abs(Voff1-Voff2)<np.max(np.column_stack((Width1, Width2)), axis=1))
+    # Move the centroids farther apart by the length of largest line width 
+    min_Voff = np.min(np.column_stack((Voff2[too_close],Voff1[too_close])))
+    max_Voff = np.max(np.column_stack((Voff2[too_close],Voff1[too_close])))
+    Voff1[too_close]=min_Voff-np.max(np.column_stack((Width1[too_close], Width2[too_close])), axis=1)/2.
+    Voff2[too_close]=max_Voff+np.max(np.column_stack((Width1[too_close], Width2[too_close])), axis=1)/2.
 
     scale = np.array([[0.2, 0.1, 0.5, 0.01]])
     gradX1 = np.random.randn(nCubes, 4) * scale
