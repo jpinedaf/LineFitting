@@ -95,7 +95,7 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
         xmat, ymat = np.indices((2 * nBorder + 1, 2 * nBorder + 1))
         cube11 = np.zeros((xarr11.shape[0], 2 * nBorder + 1, 2 * nBorder + 1))
         cube22 = np.zeros((xarr22.shape[0], 2 * nBorder + 1, 2 * nBorder + 1))
-
+        Tmax11a, Tmax11b, Tmax22a, Tmax22b = (0,) * 4
         for xx, yy in zip(xmat.flatten(), ymat.flatten()):
             T1 = Temp1[i] * (1 + gradX1[i, 0] * (xx - 1)
                              + gradY1[i, 0] * (yy - 1)) + 5
@@ -124,27 +124,40 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
                                               ntot=N1,
                                               width=W1,
                                               xoff_v=V1)
+                if (xx == nBorder) and (yy == nBorder):
+                    Tmax11a = np.max(spec11)
+                    Tmax22a = np.max(spec22)
+                    Tmax11 = np.max(spec11)
+                    Tmax22 = np.max(spec22)
             if nComps[i] == 2:
-                spec11 = (ammonia.cold_ammonia(xarr11, T1,
+                spec11a = ammonia.cold_ammonia(xarr11, T1,
                                                ntot=N1,
                                                width=W1,
                                                xoff_v=V1)
-                          + ammonia.cold_ammonia(xarr11, T2,
+                spec11b = ammonia.cold_ammonia(xarr11, T2,
                                                  ntot=N2,
                                                  width=W2,
-                                                 xoff_v=V2))
-                spec22 = (ammonia.cold_ammonia(xarr22, T1,
+                                                 xoff_v=V2)
+                spec11 = spec11a + spec11b
+
+                spec22a = ammonia.cold_ammonia(xarr22, T1,
                                                ntot=N1,
                                                width=W1,
                                                xoff_v=V1)
-                          + ammonia.cold_ammonia(xarr22, T2,
+                spec22b = ammonia.cold_ammonia(xarr22, T2,
                                                  ntot=N2,
                                                  width=W2,
-                                                 xoff_v=V2))
+                                                 xoff_v=V2)
+                spec22 = spec22a + spec22b
+                if (xx == nBorder) and (yy == nBorder):
+                    Tmax11a = np.max(spec11a)
+                    Tmax11b = np.max(spec11b)
+                    Tmax22a = np.max(spec22a)
+                    Tmax22b = np.max(spec22b)
+                    Tmax11 = np.max(spec11)
+                    Tmax22 = np.max(spec22)
             cube11[:, yy, xx] = spec11
             cube22[:, yy, xx] = spec22
-            Tmax11 = np.max(cube11[:, nBorder, nBorder])
-            Tmax22 = np.max(cube22[:, nBorder, nBorder])
         cube11 += np.random.randn(*cube11.shape) * noise_rms
         cube22 += np.random.randn(*cube22.shape) * noise_rms
         hdu11 = fits.PrimaryHDU(cube11)
@@ -155,6 +168,8 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
                                          Temp1[i], Temp2[i]]):
                 hdu11.header[kk] = vv
         hdu11.header['TMAX'] = Tmax11
+        hdu11.header['TMAX-1'] = Tmax11a
+        hdu11.header['TMAX-2'] = Tmax11b
         hdu11.header['RMS'] = noise_rms
         hdu11.header['CRVAL3'] = 23694495500.0
         hdu11.header['RESTFRQ'] = 23694495500.0
@@ -170,6 +185,8 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
                                          Temp1[i], Temp2[i]]):
                 hdu22.header[kk] = vv
         hdu22.header['TMAX'] = Tmax22
+        hdu22.header['TMAX-1'] = Tmax22a
+        hdu22.header['TMAX-2'] = Tmax22b
         hdu22.header['RMS'] = noise_rms
         hdu22.header['CRVAL3'] = 23722633600.0
         hdu22.header['RESTFRQ'] = 23722633600.0
