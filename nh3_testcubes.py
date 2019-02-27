@@ -12,7 +12,8 @@ from astropy import log
 log.setLevel('ERROR')
 
 def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
-                   output_dir='random_cubes', random_seed=None):
+                   output_dir='random_cubes', fix_vlsr=True,
+                   random_seed=None):
     """
     This places nCubes random cubes into the specified output directory
     """
@@ -37,18 +38,25 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
     Temp1 = 8 + np.random.rand(nCubes) * 17
     Temp2 = 8 + np.random.rand(nCubes) * 17
 
-    Voff1 = np.random.rand(nCubes) * 5 - 2.5
-    Voff2 = np.random.rand(nCubes) * 5 - 2.5
+    if fix_vlsr:
+        Voff1 = np.zeros(nCubes)
+    else:
+        Voff1 = np.random.rand(nCubes) * 5 - 2.5
 
-    logN1 = 13 + 2 * np.random.rand(nCubes)
-    logN2 = 13 + 2 * np.random.rand(nCubes)
+    Voff2 = Voff1 + np.random.rand(nCubes) * 5 - 2.5
 
-    Width1NT = 0.3 * np.exp(0.5 * np.random.randn(nCubes))
-    Width2NT = 0.3 * np.exp(0.5 * np.random.randn(nCubes))
+    logN1 = 13 + 1.5 * np.random.rand(nCubes)
+    logN2 = 13 + 1.5 * np.random.rand(nCubes)
+
+    Width1NT = 0.1 * np.exp(1.5 * np.random.randn(nCubes))
+    Width2NT = 0.1 * np.exp(1.5 * np.random.randn(nCubes))
+
+    # Width1 = 0.08 + 1.0 * np.random.rand(nCubes)
+    # Width2 = 0.08 + 1.0 * np.random.rand(nCubes)
 
     Width1 = np.sqrt(Width1NT + 0.08**2)
     Width2 = np.sqrt(Width2NT + 0.08**2)
-    
+    import pdb; pdb.set_trace()
     # Find where centroids are too close
     too_close = np.where(np.abs(Voff1-Voff2)<np.max(np.column_stack((Width1, Width2)), axis=1))
     # Move the centroids farther apart by the length of largest line width 
