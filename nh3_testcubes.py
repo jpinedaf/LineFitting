@@ -13,7 +13,7 @@ log.setLevel('ERROR')
 
 def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
                    output_dir='random_cubes', fix_vlsr=True,
-                   random_seed=None, remove_low_sep=False):
+                   random_seed=None, remove_low_sep=False, noise_class=False):
     """
     This places nCubes random cubes into the specified output directory
     """
@@ -33,7 +33,11 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
     nDigits = int(np.ceil(np.log10(nCubes)))
     if random_seed:
         np.random.seed(random_seed)
-    nComps = np.random.choice([1, 2], nCubes)
+    if noise_class:
+        # Creates a balanced training set with 1comp, noise, and 2comp classes
+        nComps = np.concatenate((np.ones(nCubes/3).astype(int), np.zeros(nCubes/3).astype(int), np.zeros(nCubes/3).astype(int)+2))
+    else:
+        nComps = np.random.choice([1, 2], nCubes)
 
     Temp1 = 8 + np.random.rand(nCubes) * 17
     Temp2 = 8 + np.random.rand(nCubes) * 17
@@ -173,8 +177,12 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
                     Tmax22b = np.max(spec22b)
                     Tmax11 = np.max(spec11)
                     Tmax22 = np.max(spec22)
-            cube11[:, yy, xx] = spec11
-            cube22[:, yy, xx] = spec22
+            if ncomps[i]==0:
+                cube11[:, yy, xx] = numpy.zeros(cube11.shape[0])
+                cube22[:, yy, xx] = numpy.zeros(cube22.shape[0])
+            else:
+                cube11[:, yy, xx] = spec11
+                cube22[:, yy, xx] = spec22
         cube11 += np.random.randn(*cube11.shape) * noise_rms
         cube22 += np.random.randn(*cube22.shape) * noise_rms
         hdu11 = fits.PrimaryHDU(cube11)
