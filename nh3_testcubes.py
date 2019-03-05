@@ -9,11 +9,12 @@ from astropy.io import fits
 from spectral_cube import SpectralCube
 from astropy.utils.console import ProgressBar
 from astropy import log
+import h5py
 log.setLevel('ERROR')
 
 def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
                    output_dir='random_cubes', fix_vlsr=True,
-                   random_seed=None):
+                   random_seed=None, remove_low_sep=False, noise_class=False, ml_output=False):
     """
     This places nCubes random cubes into the specified output directory
     """
@@ -30,10 +31,18 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
                     refX=nh3con.freq_dict['twotwo'] / 1e9,
                     velocity_convention='radio', refX_unit='GHz')
 
+    # Create holders for ml_output
+    out_arr = []
+    out_y = []
+
     nDigits = int(np.ceil(np.log10(nCubes)))
     if random_seed:
         np.random.seed(random_seed)
-    nComps = np.random.choice([1, 2], nCubes)
+    if noise_class:
+        # Creates a balanced training set with 1comp, noise, and 2comp classes
+        nComps = np.concatenate((np.ones(nCubes/3).astype(int), np.zeros(nCubes/3).astype(int), np.zeros(nCubes/3).astype(int)+2))
+    else:
+        nComps = np.random.choice([1, 2], nCubes)
 
     Temp1 = 8 + np.random.rand(nCubes) * 17
     Temp2 = 8 + np.random.rand(nCubes) * 17
@@ -56,14 +65,15 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
 
     Width1 = np.sqrt(Width1NT + 0.08**2)
     Width2 = np.sqrt(Width2NT + 0.08**2)
-
-    # Find where centroids are too close
-    too_close = np.where(np.abs(Voff1-Voff2)<np.max(np.column_stack((Width1, Width2)), axis=1))
-    # Move the centroids farther apart by the length of largest line width 
-    min_Voff = np.min(np.column_stack((Voff2[too_close],Voff1[too_close])), axis=1)
-    max_Voff = np.max(np.column_stack((Voff2[too_close],Voff1[too_close])), axis=1)
-    Voff1[too_close]=min_Voff-np.max(np.column_stack((Width1[too_close], Width2[too_close])), axis=1)/2.
-    Voff2[too_close]=max_Voff+np.max(np.column_stack((Width1[too_close], Width2[too_close])), axis=1)/2.
+    
+    if remove_low_sep:
+        # Find where centroids are too close
+        too_close = np.where(np.abs(Voff1-Voff2)<np.max(np.column_stack((Width1, Width2)), axis=1))
+        # Move the centroids farther apart by the length of largest line width 
+        min_Voff = np.min(np.column_stack((Voff2[too_close],Voff1[too_close])), axis=1)
+        max_Voff = np.max(np.column_stack((Voff2[too_close],Voff1[too_close])), axis=1)
+        Voff1[too_close]=min_Voff-np.max(np.column_stack((Width1[too_close], Width2[too_close])), axis=1)/2.
+        Voff2[too_close]=max_Voff+np.max(np.column_stack((Width1[too_close], Width2[too_close])), axis=1)/2.
 
     scale = np.array([[0.2, 0.1, 0.5, 0.01]])
     gradX1 = np.random.randn(nCubes, 4) * scale
@@ -172,8 +182,12 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
                     Tmax22b = np.max(spec22b)
                     Tmax11 = np.max(spec11)
                     Tmax22 = np.max(spec22)
-            cube11[:, yy, xx] = spec11
-            cube22[:, yy, xx] = spec22
+            if ncomps[i]==0:
+                cube11[:, yy, xx] = numpy.zeros(cube11.shape[0])
+                cube22[:, yy, xx] = numpy.zeros(cube22.shape[0])
+            else:
+                cube11[:, yy, xx] = spec11
+                cube22[:, yy, xx] = spec22
         cube11 += np.random.randn(*cube11.shape) * noise_rms
         cube22 += np.random.randn(*cube22.shape) * noise_rms
         hdu11 = fits.PrimaryHDU(cube11)
@@ -209,6 +223,29 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
         hdu22.writeto(output_dir + '/random_cube_NH3_22_'
                       + '{0}'.format(i).zfill(nDigits) + '.fits',
                       overwrite=True)
+
+        if ml_output:	
+            # Grab central pixel and normalize
+            loc11 = cube11[:,1,1].reshape(1000,1)
+            loc11 = loc11/np.max(loc11)
+            # Grab 3x3 average and normalize
+            glob11 = np.mean(cube11.reshape(1000,9),axis=1)
+            glob11 = glob11/np.max(glob11)
+            z = np.column_stack((loc11,glob11))
+            # Append to arrays
+            out_arr.append(z)
+            out_y.append(nComps[i])
+
+    if ml_output:
+        out_y1 = np.where(np.array(out_y)==1, 1, 0)
+        out_y2 = np.where(np.array(out_y)==0, 1, 0)
+        out_y3 = np.where(np.array(out_y)==2, 1, 0)
+        with h5py.File('nh3_three_class.h5', 'w') as hf:
+	          hf.create_dataset('data', data=np.array(out_arr))
+	          hf.close()
+        with h5py.File('labels_nh3_three_class.h5', 'w') as hf:
+	          hf.create_dataset('data', data=np.column_stack((out_y1, out_y2, out_y3)))
+	          hf.close()
 
 if __name__ == '__main__':
     print(sys.argv)
