@@ -111,78 +111,14 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
                 'SIG1', 'SIG2', 'TKIN1', 'TKIN2']
 
     for i in ProgressBar(range(nCubes)):
-        xmat, ymat = np.indices((2 * nBorder + 1, 2 * nBorder + 1))
-        cube11 = np.zeros((xarr11.shape[0], 2 * nBorder + 1, 2 * nBorder + 1))
-        cube22 = np.zeros((xarr22.shape[0], 2 * nBorder + 1, 2 * nBorder + 1))
-        Tmax11a, Tmax11b, Tmax22a, Tmax22b = (0,) * 4
-        for xx, yy in zip(xmat.flatten(), ymat.flatten()):
-            T1 = Temp1[i] * (1 + gradX1[i, 0] * (xx - 1)
-                             + gradY1[i, 0] * (yy - 1)) + 5
-            T2 = Temp2[i] * (1 + gradX2[i, 0] * (xx - 1)
-                             + gradY2[i, 0] * (yy - 1)) + 5
-            if T1 < 2.74:
-                T1 = 2.74
-            if T2 < 2.74:
-                T2 = 2.74
-            W1 = np.abs(Width1[i] * (1 + gradX1[i, 1] * (xx - 1)
-                                     + gradY1[i, 1] * (yy - 1)))
-            W2 = np.abs(Width2[i] * (1 + gradX2[i, 1] * (xx - 1)
-                                     + gradY2[i, 1] * (yy - 1)))
-            V1 = Voff1[i] + (gradX1[i, 2] * (xx - 1) + gradY1[i, 2] * (yy - 1))
-            V2 = Voff2[i] + (gradX2[i, 2] * (xx - 1) + gradY2[i, 2] * (yy - 1))
-            N1 = logN1[i] * (1 + gradX1[i, 3] * (xx - 1)
-                             + gradY1[i, 3] * (yy - 1))
-            N2 = logN2[i] * (1 + gradX2[i, 3] * (xx - 1)
-                             + gradY2[i, 3] * (yy - 1))
-            if nComps[i] == 1:
-                spec11 = ammonia.cold_ammonia(xarr11, T1,
-                                              ntot=N1,
-                                              width=W1,
-                                              xoff_v=V1)
-                spec22 = ammonia.cold_ammonia(xarr22, T1,
-                                              ntot=N1,
-                                              width=W1,
-                                              xoff_v=V1)
-                if (xx == nBorder) and (yy == nBorder):
-                    Tmax11a = np.max(spec11)
-                    Tmax22a = np.max(spec22)
-                    Tmax11 = np.max(spec11)
-                    Tmax22 = np.max(spec22)
-            if nComps[i] == 2:
-                spec11a = ammonia.cold_ammonia(xarr11, T1,
-                                               ntot=N1,
-                                               width=W1,
-                                               xoff_v=V1)
-                spec11b = ammonia.cold_ammonia(xarr11, T2,
-                                                 ntot=N2,
-                                                 width=W2,
-                                                 xoff_v=V2)
-                spec11 = spec11a + spec11b
+        results = make_cube(nComps, nBorder, i, xarr11, xarr22, Temp1, Temp2, Width1, Width2, Voff1, Voff2, logN1, logN2, gradX1, gradY1, gradX2, gradY2, noise_rms)
 
-                spec22a = ammonia.cold_ammonia(xarr22, T1,
-                                               ntot=N1,
-                                               width=W1,
-                                               xoff_v=V1)
-                spec22b = ammonia.cold_ammonia(xarr22, T2,
-                                                 ntot=N2,
-                                                 width=W2,
-                                                 xoff_v=V2)
-                spec22 = spec22a + spec22b
-                if (xx == nBorder) and (yy == nBorder):
-                    Tmax11a = np.max(spec11a)
-                    Tmax11b = np.max(spec11b)
-                    Tmax22a = np.max(spec22a)
-                    Tmax22b = np.max(spec22b)
-                    Tmax11 = np.max(spec11)
-                    Tmax22 = np.max(spec22)
-            if nComps[i]==0:
-                cube11[:, yy, xx] = numpy.zeros(cube11.shape[0])
-                cube22[:, yy, xx] = numpy.zeros(cube22.shape[0])
-            else:
-                cube11[:, yy, xx] = spec11
-                cube22[:, yy, xx] = spec22
-        cube11 += np.random.randn(*cube11.shape) * noise_rms
-        cube22 += np.random.randn(*cube22.shape) * noise_rms
+        Tmax11a, Tmax11b, Tmax22a, Tmax22b = results['Tmax11a'], results['Tmax11b'], results['Tmax22a'], results['Tmax22b']
+        Tmax11, Tmax22 = results['Tmax11'], results['Tmax11']
+        cube11, cube22 = results['cube11'], results['cube22']
+
+
+
         hdu11 = fits.PrimaryHDU(cube11)
         for kk in hdrkwds:
             hdu11.header[kk] = hdrkwds[kk]
@@ -239,6 +175,87 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
         with h5py.File('labels_nh3_three_class.h5', 'w') as hf:
 	          hf.create_dataset('data', data=np.column_stack((out_y1, out_y2, out_y3)))
 	          hf.close()
+
+
+def make_cube(nComps, nBorder, i, xarr11, xarr22, Temp1, Temp2, Width1, Width2, Voff1, Voff2, logN1, logN2, gradX1, gradY1, gradX2, gradY2, noise_rms):
+
+    results = {}
+
+    xmat, ymat = np.indices((2 * nBorder + 1, 2 * nBorder + 1))
+    cube11 = np.zeros((xarr11.shape[0], 2 * nBorder + 1, 2 * nBorder + 1))
+    cube22 = np.zeros((xarr22.shape[0], 2 * nBorder + 1, 2 * nBorder + 1))
+    Tmax11a, Tmax11b, Tmax22a, Tmax22b = (0,) * 4
+    results['Tmax11a'], results['Tmax11b'], results['Tmax22a'], results['Tmax22b'] = Tmax11a, Tmax11b, Tmax22a, Tmax22b
+
+    for xx, yy in zip(xmat.flatten(), ymat.flatten()):
+        T1 = Temp1[i] * (1 + gradX1[i, 0] * (xx - 1)
+                         + gradY1[i, 0] * (yy - 1)) + 5
+        T2 = Temp2[i] * (1 + gradX2[i, 0] * (xx - 1)
+                         + gradY2[i, 0] * (yy - 1)) + 5
+        if T1 < 2.74:
+            T1 = 2.74
+        if T2 < 2.74:
+            T2 = 2.74
+        W1 = np.abs(Width1[i] * (1 + gradX1[i, 1] * (xx - 1)
+                                 + gradY1[i, 1] * (yy - 1)))
+        W2 = np.abs(Width2[i] * (1 + gradX2[i, 1] * (xx - 1)
+                                 + gradY2[i, 1] * (yy - 1)))
+        V1 = Voff1[i] + (gradX1[i, 2] * (xx - 1) + gradY1[i, 2] * (yy - 1))
+        V2 = Voff2[i] + (gradX2[i, 2] * (xx - 1) + gradY2[i, 2] * (yy - 1))
+        N1 = logN1[i] * (1 + gradX1[i, 3] * (xx - 1)
+                         + gradY1[i, 3] * (yy - 1))
+        N2 = logN2[i] * (1 + gradX2[i, 3] * (xx - 1)
+                         + gradY2[i, 3] * (yy - 1))
+
+        if nComps[i] == 1:
+            spec11 = ammonia.cold_ammonia(xarr11, T1, ntot=N1, width=W1, xoff_v=V1)
+            spec22 = ammonia.cold_ammonia(xarr22, T1, ntot=N1, width=W1, xoff_v=V1)
+            if (xx == nBorder) and (yy == nBorder):
+                Tmax11a = np.max(spec11)
+                Tmax22a = np.max(spec22)
+                Tmax11 = np.max(spec11)
+                Tmax22 = np.max(spec22)
+                results['Tmax11a'], results['Tmax22a'] = Tmax11a, Tmax22a
+                results['Tmax11'], results['Tmax11'] = Tmax11, Tmax22
+
+        if nComps[i] == 2:
+            spec11a = ammonia.cold_ammonia(xarr11, T1, ntot=N1, width=W1, xoff_v=V1)
+            spec11b = ammonia.cold_ammonia(xarr11, T2, ntot=N2, width=W2, xoff_v=V2)
+            spec11 = spec11a + spec11b
+
+            spec22a = ammonia.cold_ammonia(xarr22, T1,
+                                           ntot=N1,
+                                           width=W1,
+                                           xoff_v=V1)
+            spec22b = ammonia.cold_ammonia(xarr22, T2,
+                                           ntot=N2,
+                                           width=W2,
+                                           xoff_v=V2)
+            spec22 = spec22a + spec22b
+            if (xx == nBorder) and (yy == nBorder):
+                Tmax11a = np.max(spec11a)
+                Tmax11b = np.max(spec11b)
+                Tmax22a = np.max(spec22a)
+                Tmax22b = np.max(spec22b)
+                Tmax11 = np.max(spec11)
+                Tmax22 = np.max(spec22)
+                results['Tmax11a'], results['Tmax11b'], results['Tmax22a'], results['Tmax22b'] =\
+                    Tmax11a, Tmax11b, Tmax22a, Tmax22b
+                results['Tmax11'], results['Tmax11'] = Tmax11, Tmax22
+
+        if nComps[i] == 0:
+            cube11[:, yy, xx] = numpy.zeros(cube11.shape[0])
+            cube22[:, yy, xx] = numpy.zeros(cube22.shape[0])
+        else:
+            cube11[:, yy, xx] = spec11
+            cube22[:, yy, xx] = spec22
+
+    cube11 += np.random.randn(*cube11.shape) * noise_rms
+    cube22 += np.random.randn(*cube22.shape) * noise_rms
+    results['cube11'], results['cube22'] = cube11, cube22
+
+    return results
+
 
 if __name__ == '__main__':
     print(sys.argv)
