@@ -175,7 +175,7 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
                     Tmax22b = np.max(spec22b)
                     Tmax11 = np.max(spec11)
                     Tmax22 = np.max(spec22)
-            if ncomps[i]==0:
+            if nComps[i]==0:
                 cube11[:, yy, xx] = numpy.zeros(cube11.shape[0])
                 cube22[:, yy, xx] = numpy.zeros(cube22.shape[0])
             else:
