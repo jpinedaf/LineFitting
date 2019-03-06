@@ -81,13 +81,6 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
     gradX2 = np.random.randn(nCubes, 4) * scale
     gradY2 = np.random.randn(nCubes, 4) * scale
 
-    params1 = [{'ntot':14,
-                'width':1,
-                'xoff_v':0.0}] * nCubes
-    params2 = [{'ntot':14,
-                'width':1,
-                'xoff_v':0.0}] * nCubes
-
     hdrkwds = {'BUNIT': 'K',
                'INSTRUME': 'KFPA    ',
                'BMAJ': 0.008554169991270138,
