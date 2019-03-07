@@ -13,12 +13,33 @@ from astropy.utils.console import ProgressBar
 from astropy import log
 log.setLevel('ERROR')
 
-def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cubes', fix_vlsr=True, random_seed=None,
-                   remove_low_sep=False, noise_class=False):#, ml_output=False):
-    """
-    This places nCubes random cubes into the specified output directory
-    """
 
+def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cubes', fix_vlsr=True, random_seed=None,
+                   remove_low_sep=False, noise_class=False, linenames=['oneone', 'twotwo']):
+
+    xarrList = []
+    lineIDList = []
+
+    for linename in linenames:
+        # generate spectral axis for each ammonia lines
+        xarr = spaxis((np.linspace(-500, 499, 1000) * 5.72e-6
+                       + nh3con.freq_dict[linename] / 1e9),
+                      unit='GHz',
+                      refX=nh3con.freq_dict[linename] / 1e9,
+                      velocity_convention='radio', refX_unit='GHz')
+        xarrList.append(xarr)
+
+        # specify the ID fore each line to appear in  saved fits files
+        if linename is 'oneone':
+            lineIDList.append('11')
+        elif linename is 'twotwo':
+            lineIDList.append('22')
+        else:
+            # use line names at it is for lines above (3,3)
+            lineIDList.append(linename)
+
+
+    '''
     xarr11 = spaxis((np.linspace(-500, 499, 1000) * 5.72e-6
                      + nh3con.freq_dict['oneone'] / 1e9),
                     unit='GHz',
@@ -29,6 +50,7 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
                      + nh3con.freq_dict['twotwo'] / 1e9), unit='GHz',
                     refX=nh3con.freq_dict['twotwo'] / 1e9,
                     velocity_convention='radio', refX_unit='GHz')
+    '''
 
     if random_seed:
         np.random.seed(random_seed)
@@ -72,16 +94,35 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
     gradX2 = np.random.randn(nCubes, 4) * scale
     gradY2 = np.random.randn(nCubes, 4) * scale
 
-    cubeList11 = []
-    cubeList22 = []
+    cubes = []
+    #cubeList11 = []
+    #cubeList22 = []
 
-    for i in ProgressBar(range(nCubes)):
-        Temp = np.array([Temp1, Temp2])
-        Width = np.array([Width1, Width2])
-        Voff = np.array([Voff1, Voff2])
-        logN = np.array([logN1, logN2])
-        gradX = np.array([gradX1, gradX2])
-        gradY = np.array([gradY1, gradY2])
+    Temp = np.array([Temp1, Temp2])
+    Width = np.array([Width1, Width2])
+    Voff = np.array([Voff1, Voff2])
+    logN = np.array([logN1, logN2])
+    gradX = np.array([gradX1, gradX2])
+    gradY = np.array([gradY1, gradY2])
+
+    cubes = []
+
+    for xarr, lineID in zip(xarrList, lineIDList):
+
+        cubeList = []
+        print('----------- generating {0} lines ------------'.format(lineID))
+        for i in ProgressBar(range(nCubes)):
+            # generate synthetic cubes
+            results = make_cube(nComps[i], nBorder, i, xarr, Temp, Width, Voff, logN, gradX, gradY, noise_rms)
+            # write the synthetic cubes as fits files
+            write_fits_cube(results['cube'], nCubes, nComps, i, logN1, logN2, Voff1, Voff2, Width1, Width2, Temp1, Temp2,
+                            noise_rms, results['Tmax'], results['Tmax_a'], results['Tmax_b'],
+                            lineID, output_dir=output_dir)
+            cubeList.append(results['cube'])
+
+        cubes.append(cubeList)
+
+        '''
 
         results11 = make_cube(nComps[i], nBorder, i, xarr11, Temp, Width, Voff, logN, gradX, gradY, noise_rms)
         results22 = make_cube(nComps[i], nBorder, i, xarr22, Temp, Width, Voff, logN, gradX, gradY, noise_rms)
@@ -97,11 +138,11 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
 
         write_fits_cube(cube22, nCubes, nComps, i, logN1, logN2, Voff1, Voff2, Width1, Width2, Temp1, Temp2, noise_rms,
                     Tmax22, Tmax22a, Tmax22b, lineID='22', output_dir=output_dir)
-
         cubeList11.append(cube11)
         cubeList22.append(cube22)
+        '''
 
-    return cubeList11, cubeList22
+    return cubes
 
 
 
@@ -151,7 +192,9 @@ def make_cube(nComps, nBorder, i, xarr, Temp, Width, Voff, logN, gradX, gradY, n
 
 def write_fits_cube(cube, nCubes, nComps, i, logN1, logN2, Voff1, Voff2, Width1, Width2, Temp1, Temp2, noise_rms,
                     Tmax, Tmax_a, Tmax_b, lineID='11', output_dir='random_cubes'):
-
+    """
+    This places nCubes random cubes into the specified output directory
+    """
     if not os.path.isdir(output_dir):
         os.mkdir(output_dir)
 
