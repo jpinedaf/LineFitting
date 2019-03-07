@@ -1,4 +1,3 @@
-import pyspeckit
 import pyspeckit.spectrum.models.ammonia as ammonia
 import pyspeckit.spectrum.models.ammonia_constants as nh3con
 from pyspeckit.spectrum.units import SpectroscopicAxis as spaxis
@@ -6,9 +5,7 @@ from string import ascii_lowercase
 import os
 import sys
 import numpy as np
-import astropy.units as u
 from astropy.io import fits
-from spectral_cube import SpectralCube
 from astropy.utils.console import ProgressBar
 from astropy import log
 log.setLevel('ERROR')
