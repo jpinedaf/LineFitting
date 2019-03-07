@@ -11,31 +11,29 @@ from astropy.io import fits
 from spectral_cube import SpectralCube
 from astropy.utils.console import ProgressBar
 from astropy import log
-import h5py
+#import h5py
 log.setLevel('ERROR')
 
-def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
-                   output_dir='random_cubes', fix_vlsr=True,
-                   random_seed=None, remove_low_sep=False, noise_class=False, ml_output=False):
+def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cubes', fix_vlsr=True, random_seed=None,
+                   remove_low_sep=False, noise_class=False):#, ml_output=False):
     """
     This places nCubes random cubes into the specified output directory
     """
 
-    if not os.path.isdir(output_dir):
-        os.mkdir(output_dir)
     xarr11 = spaxis((np.linspace(-500, 499, 1000) * 5.72e-6
                      + nh3con.freq_dict['oneone'] / 1e9),
                     unit='GHz',
                     refX=nh3con.freq_dict['oneone'] / 1e9,
                     velocity_convention='radio', refX_unit='GHz')
+
     xarr22 = spaxis((np.linspace(-500, 499, 1000) * 5.72e-6
                      + nh3con.freq_dict['twotwo'] / 1e9), unit='GHz',
                     refX=nh3con.freq_dict['twotwo'] / 1e9,
                     velocity_convention='radio', refX_unit='GHz')
 
     # Create holders for ml_output
-    out_arr = []
-    out_y = []
+    #out_arr = []
+    #out_y = []
 
     if random_seed:
         np.random.seed(random_seed)
@@ -79,6 +77,9 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
     gradX2 = np.random.randn(nCubes, 4) * scale
     gradY2 = np.random.randn(nCubes, 4) * scale
 
+    cubeList11 = []
+    cubeList22 = []
+
     for i in ProgressBar(range(nCubes)):
         Temp = np.array([Temp1, Temp2])
         Width = np.array([Width1, Width2])
@@ -102,7 +103,12 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
         write_fits_cube(cube22, nCubes, nComps, i, logN1, logN2, Voff1, Voff2, Width1, Width2, Temp1, Temp2, noise_rms,
                     Tmax22, Tmax22a, Tmax22b, lineID='22', output_dir=output_dir)
 
+        cubeList11.append(cube11)
+        cubeList22.append(cube22)
 
+    return cubeList11, cubeList22
+
+    '''
         if ml_output:	
             # Grab central pixel and normalize
             loc11 = cube11[:,1,1].reshape(1000,1)
@@ -125,7 +131,7 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
         with h5py.File('labels_nh3_three_class.h5', 'w') as hf:
 	          hf.create_dataset('data', data=np.column_stack((out_y1, out_y2, out_y3)))
 	          hf.close()
-
+    '''
 
 
 def make_cube(nComps, nBorder, i, xarr, Temp, Width, Voff, logN, gradX, gradY, noise_rms):
@@ -158,7 +164,7 @@ def make_cube(nComps, nBorder, i, xarr, Temp, Width, Voff, logN, gradX, gradY, n
                 Tmaxj = np.max(spec_j)
                 results['Tmax_{}'.format(ascii_lowercase[j])] = Tmaxj
 
-            # add the component to the total spectrum
+            # add each component to the total spectrum
             spec = spec + spec_j
 
         cube[:, yy, xx] = spec
@@ -174,6 +180,9 @@ def make_cube(nComps, nBorder, i, xarr, Temp, Width, Voff, logN, gradX, gradY, n
 
 def write_fits_cube(cube, nCubes, nComps, i, logN1, logN2, Voff1, Voff2, Width1, Width2, Temp1, Temp2, noise_rms,
                     Tmax, Tmax_a, Tmax_b, lineID='11', output_dir='random_cubes'):
+
+    if not os.path.isdir(output_dir):
+        os.mkdir(output_dir)
 
     nDigits = int(np.ceil(np.log10(nCubes)))
 
