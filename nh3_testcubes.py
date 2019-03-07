@@ -11,7 +11,6 @@ from astropy.io import fits
 from spectral_cube import SpectralCube
 from astropy.utils.console import ProgressBar
 from astropy import log
-#import h5py
 log.setLevel('ERROR')
 
 def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cubes', fix_vlsr=True, random_seed=None,
@@ -30,10 +29,6 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
                      + nh3con.freq_dict['twotwo'] / 1e9), unit='GHz',
                     refX=nh3con.freq_dict['twotwo'] / 1e9,
                     velocity_convention='radio', refX_unit='GHz')
-
-    # Create holders for ml_output
-    #out_arr = []
-    #out_y = []
 
     if random_seed:
         np.random.seed(random_seed)
@@ -108,30 +103,6 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
 
     return cubeList11, cubeList22
 
-    '''
-        if ml_output:	
-            # Grab central pixel and normalize
-            loc11 = cube11[:,1,1].reshape(1000,1)
-            loc11 = loc11/np.max(loc11)
-            # Grab 3x3 average and normalize
-            glob11 = np.mean(cube11.reshape(1000,9),axis=1)
-            glob11 = glob11/np.max(glob11)
-            z = np.column_stack((loc11,glob11))
-            # Append to arrays
-            out_arr.append(z)
-            out_y.append(nComps[i])
-
-    if ml_output:
-        out_y1 = np.where(np.array(out_y)==1, 1, 0)
-        out_y2 = np.where(np.array(out_y)==0, 1, 0)
-        out_y3 = np.where(np.array(out_y)==2, 1, 0)
-        with h5py.File('nh3_three_class.h5', 'w') as hf:
-	          hf.create_dataset('data', data=np.array(out_arr))
-	          hf.close()
-        with h5py.File('labels_nh3_three_class.h5', 'w') as hf:
-	          hf.create_dataset('data', data=np.column_stack((out_y1, out_y2, out_y3)))
-	          hf.close()
-    '''
 
 
 def make_cube(nComps, nBorder, i, xarr, Temp, Width, Voff, logN, gradX, gradY, noise_rms):
