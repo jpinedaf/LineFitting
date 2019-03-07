@@ -161,9 +161,11 @@ def make_cube(nComps, nBorder, xarr, Temp, Width, Voff, logN, gradX, gradY, nois
 def write_fits_cube(cube, nCubes, nComps, i, logN, Voff, Width, Temp, noise_rms,
                     Tmax, Tmax_a, Tmax_b, linename, output_dir='random_cubes'):
     """
-    This places nCubes random cubes into the specified output directory
+    Function to write a test cube as a fits file
+    Note: only currently compatible with nComp <= 2
     """
     if not os.path.isdir(output_dir):
+        #  This places nCubes random cubes into the specified output directory
         os.mkdir(output_dir)
 
     logN1, logN2 = logN[0], logN[1]
