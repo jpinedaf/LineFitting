@@ -38,22 +38,9 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
             # use line names at it is for lines above (3,3)
             lineIDList.append(linename)
 
-
-    '''
-    xarr11 = spaxis((np.linspace(-500, 499, 1000) * 5.72e-6
-                     + nh3con.freq_dict['oneone'] / 1e9),
-                    unit='GHz',
-                    refX=nh3con.freq_dict['oneone'] / 1e9,
-                    velocity_convention='radio', refX_unit='GHz')
-
-    xarr22 = spaxis((np.linspace(-500, 499, 1000) * 5.72e-6
-                     + nh3con.freq_dict['twotwo'] / 1e9), unit='GHz',
-                    refX=nh3con.freq_dict['twotwo'] / 1e9,
-                    velocity_convention='radio', refX_unit='GHz')
-    '''
-
     if random_seed:
         np.random.seed(random_seed)
+
     if noise_class:
         # Creates a balanced training set with 1comp, noise, and 2comp classes
         nComps = np.concatenate((np.ones(nCubes/3).astype(int), np.zeros(nCubes/3).astype(int), np.zeros(nCubes/3).astype(int)+2))
@@ -94,10 +81,6 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
     gradX2 = np.random.randn(nCubes, 4) * scale
     gradY2 = np.random.randn(nCubes, 4) * scale
 
-    cubes = []
-    #cubeList11 = []
-    #cubeList22 = []
-
     Temp = np.array([Temp1, Temp2])
     Width = np.array([Width1, Width2])
     Voff = np.array([Voff1, Voff2])
@@ -121,26 +104,6 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
             cubeList.append(results['cube'])
 
         cubes.append(cubeList)
-
-        '''
-
-        results11 = make_cube(nComps[i], nBorder, i, xarr11, Temp, Width, Voff, logN, gradX, gradY, noise_rms)
-        results22 = make_cube(nComps[i], nBorder, i, xarr22, Temp, Width, Voff, logN, gradX, gradY, noise_rms)
-
-        Tmax11, Tmax11a, Tmax11b  = results11['Tmax'], results11['Tmax_a'], results11['Tmax_b']
-        cube11 = results11['cube']
-
-        Tmax22, Tmax22a, Tmax22b  = results22['Tmax'], results22['Tmax_a'], results22['Tmax_b']
-        cube22 = results22['cube']
-
-        write_fits_cube(cube11, nCubes, nComps, i, logN1, logN2, Voff1, Voff2, Width1, Width2, Temp1, Temp2, noise_rms,
-                    Tmax11, Tmax11a, Tmax11b, lineID='11', output_dir=output_dir)
-
-        write_fits_cube(cube22, nCubes, nComps, i, logN1, logN2, Voff1, Voff2, Width1, Width2, Temp1, Temp2, noise_rms,
-                    Tmax22, Tmax22a, Tmax22b, lineID='22', output_dir=output_dir)
-        cubeList11.append(cube11)
-        cubeList22.append(cube22)
-        '''
 
     return cubes
 
