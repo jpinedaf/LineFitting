@@ -39,6 +39,7 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
             # use line names at it is for lines above (3,3)
             lineIDList.append(linename)
 
+    # generate random parameters for nCubes
     nComps, Temp, Width, Voff, logN = generate_parameters(nCubes, random_seed)
     gradX, gradY = generate_gradients(nCubes, random_seed)
 
@@ -49,20 +50,26 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
         cubeList = []
         print('----------- generating {0} lines ------------'.format(lineID))
         for i in ProgressBar(range(nCubes)):
+            cube_i = make_and_write(nCubes, nComps[i], i, nBorder, xarr, Temp[i], Width[i], Voff[i], logN[i], gradX[i], gradY[i]
+                           , noise_rms, lineID, output_dir)
 
-            results = make_cube(nComps[i], nBorder, xarr,
-                                Temp[i], Width[i], Voff[i], logN[i], gradX[i], gradY[i], noise_rms)
-
-            write_fits_cube(results['cube'], nCubes, nComps[i], i,
-                            logN[i], Voff[i], Width[i], Temp[i], noise_rms,
-                            results['Tmax'], results['Tmax_a'],
-                            results['Tmax_b'], lineID,
-                            output_dir=output_dir)
-
-            cubeList.append(results['cube'])
+            cubeList.append(cube_i)
         cubes.append(cubeList)
 
     return cubes
+
+
+
+def make_and_write(nCubes, nComp, i, nBorder, xarr, T, W, V, N, grdX, grdY, noise_rms, lineID, output_dir):
+    # wrapper for make_cube() and write_fits_cube()
+
+    results = make_cube(nComp, nBorder, xarr, T, W, V, N, grdX, grdY, noise_rms)
+
+    write_fits_cube(results['cube'], nCubes, nComp, i, N, V, W, T, noise_rms,
+                    results['Tmax'], results['Tmax_a'], results['Tmax_b'], lineID,
+                    output_dir)
+
+    return results['cube']
 
 
 
@@ -72,6 +79,7 @@ def generate_gradients(nCubes, random_seed=None):
         np.random.seed(random_seed)
     # scaling for the temp, sigma, voff, and logN parameters
     scale = np.array([[0.2, 0.1, 0.5, 0.01]])
+    # 0.5 km/s/pix is about 39.7 km/s/pc at 260pc away at 10"/pix
     gradX1 = np.random.randn(nCubes, 4) * scale
     gradY1 = np.random.randn(nCubes, 4) * scale
     gradX2 = np.random.randn(nCubes, 4) * scale
@@ -160,47 +168,6 @@ def make_cube(nComps, nBorder, xarr, Temp, Width, Voff, logN, gradX, gradY, nois
     results['cube'] = cube
     return results
 
-'''
-def make_cube(nComps, nBorder, i, xarr, Temp, Width, Voff, logN, gradX, gradY, noise_rms):
-    # the length of Temp, Width, Voff, logN, gradX, and gradY should match the number of components
-    xmat, ymat = np.indices((2 * nBorder + 1, 2 * nBorder + 1))
-    cube = np.zeros((xarr.shape[0], 2 * nBorder + 1, 2 * nBorder + 1))
-
-    results = {}
-    results['Tmax_a'], results['Tmax_b'] = (0,) * 2
-
-    for xx, yy in zip(xmat.flatten(), ymat.flatten()):
-
-        spec = np.zeros(cube.shape[0])
-
-        for j in range(nComps):
-            # define parameters
-            T = Temp[j][i] * (1 + gradX[j][i, 0] * (xx - 1) + gradY[j][i, 0] * (yy - 1)) + 5
-            if T < 2.74:
-                T = 2.74
-            W = np.abs(Width[j][i] * (1 + gradX[j][i, 1] * (xx - 1) + gradY[j][i, 1] * (yy - 1)))
-            V = Voff[j][i] + (gradX[j][i, 2] * (xx - 1) + gradY[j][i, 2] * (yy - 1))
-            N = logN[j][i] * (1 + gradX[j][i, 3] * (xx - 1) + gradY[j][i, 3] * (yy - 1))
-
-            # generate spectrum
-            spec_j = ammonia.cold_ammonia(xarr, T, ntot=N, width=W, xoff_v=V)
-
-            if (xx == nBorder) and (yy == nBorder):
-                Tmaxj = np.max(spec_j)
-                results['Tmax_{}'.format(ascii_lowercase[j])] = Tmaxj
-
-            # add each component to the total spectrum
-            spec = spec + spec_j
-
-        cube[:, yy, xx] = spec
-        if (xx == nBorder) and (yy == nBorder):
-            Tmax = np.max(spec)
-            results['Tmax'] = Tmax
-
-    cube += np.random.randn(*cube.shape) * noise_rms
-    results['cube'] = cube
-    return results
-'''
 
 
 def write_fits_cube(cube, nCubes, nComps, i, logN, Voff, Width, Temp, noise_rms,
@@ -246,7 +213,6 @@ def write_fits_cube(cube, nCubes, nComps, i, logN, Voff, Width, Temp, noise_rms,
                'SSYSOBS': 'TOPOCENT'}
     truekwds = ['NCOMP', 'LOGN1', 'LOGN2', 'VLSR1', 'VLSR2',
                 'SIG1', 'SIG2', 'TKIN1', 'TKIN2']
-
 
     hdu = fits.PrimaryHDU(cube)
     for kk in hdrkwds:
