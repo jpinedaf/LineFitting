@@ -14,8 +14,9 @@ from astropy import log
 log.setLevel('ERROR')
 
 
+
 def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cubes', random_seed=None,
-                   remove_low_sep=False, noise_class=False, linenames=['oneone', 'twotwo']):
+                   linenames=['oneone', 'twotwo']):
 
     xarrList = []
     lineIDList = []
@@ -40,24 +41,33 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
 
     nComps, Temp, Width, Voff, logN = generate_parameters(nCubes, random_seed)
 
-    if noise_class:
-        # Creates a balanced training set with 1comp, noise, and 2comp classes
-        nComps = np.concatenate((np.ones(nCubes / 3).astype(int),
-                                 np.zeros(nCubes / 3).astype(int),
-                                 np.zeros(nCubes / 3).astype(int) + 2))
+    gradX, gradY = generate_vGrad(nCubes, random_seed)
 
-    if remove_low_sep:
-        Voff1 = Voff[0]
-        Voff2 = Voff[0]
-        # Find where centroids are too close
-        too_close = np.where(np.abs(Voff1 - Voff2) < np.max(np.column_stack((Width1, Width2)), axis=1))
-        # Move the centroids farther apart by the length of largest line width
-        min_Voff = np.min(np.column_stack((Voff2[too_close], Voff1[too_close])), axis=1)
-        max_Voff = np.max(np.column_stack((Voff2[too_close], Voff1[too_close])), axis=1)
-        Voff1[too_close] = min_Voff - np.max(np.column_stack((Width1[too_close], Width2[too_close])), axis=1) / 2.
-        Voff2[too_close] = max_Voff + np.max(np.column_stack((Width1[too_close], Width2[too_close])), axis=1) / 2.
-        Voff = np.array([Voff1, Voff2])
+    cubes = []
 
+    for xarr, lineID in zip(xarrList, lineIDList):
+        # generate cubes for each line specified
+        cubeList = []
+        print('----------- generating {0} lines ------------'.format(lineID))
+        for i in ProgressBar(range(nCubes)):
+            results = make_cube(nComps[i], nBorder, i, xarr,
+                                Temp, Width, Voff, logN, gradX, gradY, noise_rms)
+            write_fits_cube(results['cube'], nCubes, nComps, i,
+                            logN, Voff, Width, Temp, noise_rms,
+                            results['Tmax'], results['Tmax_a'],
+                            results['Tmax_b'], lineID,
+                            output_dir=output_dir)
+            cubeList.append(results['cube'])
+        cubes.append(cubeList)
+
+    return cubes
+
+
+
+def generate_vGrad(nCubes, random_seed=None):
+    # generate random velocity gradient in the X & Y directions to be apply to the cube model
+    if random_seed:
+        np.random.seed(random_seed)
     scale = np.array([[0.2, 0.1, 0.5, 0.01]])
     gradX1 = np.random.randn(nCubes, 4) * scale
     gradY1 = np.random.randn(nCubes, 4) * scale
@@ -66,26 +76,7 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
 
     gradX = np.array([gradX1, gradX2])
     gradY = np.array([gradY1, gradY2])
-
-    cubes = []
-
-    for xarr, lineID in zip(xarrList, lineIDList):
-        # generate cubes for each lines specified
-        cubeList = []
-
-        print('----------- generating {0} lines ------------'.format(lineID))
-        for i in ProgressBar(range(nCubes)):
-            results = make_cube(nComps[i], nBorder, i, xarr, Temp, Width, Voff, logN, gradX, gradY, noise_rms)
-            write_fits_cube(results['cube'], nCubes, nComps, i,
-                            logN[0], logN[1], Voff[0], Voff[1], Width[0], Width[1], Temp[0], Temp[1],
-                            noise_rms, results['Tmax'], results['Tmax_a'], results['Tmax_b'],
-                            lineID, output_dir=output_dir)
-            cubeList.append(results['cube'])
-
-        cubes.append(cubeList)
-
-    return cubes
-
+    return gradX, gradY
 
 
 
@@ -126,12 +117,10 @@ def generate_parameters(nCubes, random_seed=None, fix_vlsr=True):
 
 def make_cube(nComps, nBorder, i, xarr, Temp, Width, Voff, logN, gradX, gradY, noise_rms):
     # the length of Temp, Width, Voff, logN, gradX, and gradY should match the number of components
-
-    results = {}
-
     xmat, ymat = np.indices((2 * nBorder + 1, 2 * nBorder + 1))
     cube = np.zeros((xarr.shape[0], 2 * nBorder + 1, 2 * nBorder + 1))
 
+    results = {}
     results['Tmax_a'], results['Tmax_b'] = (0,) * 2
 
     for xx, yy in zip(xmat.flatten(), ymat.flatten()):
@@ -168,13 +157,18 @@ def make_cube(nComps, nBorder, i, xarr, Temp, Width, Voff, logN, gradX, gradY, n
 
 
 
-def write_fits_cube(cube, nCubes, nComps, i, logN1, logN2, Voff1, Voff2, Width1, Width2, Temp1, Temp2, noise_rms,
+def write_fits_cube(cube, nCubes, nComps, i, logN, Voff, Width, Temp, noise_rms,
                     Tmax, Tmax_a, Tmax_b, lineID='11', output_dir='random_cubes'):
     """
     This places nCubes random cubes into the specified output directory
     """
     if not os.path.isdir(output_dir):
         os.mkdir(output_dir)
+
+    logN1, logN2 = logN[0], logN[1]
+    Voff1, Voff2 = Voff[0], Voff[1]
+    Width1, Width2 = Width[0], Width[1]
+    Temp1, Temp2 = Temp[0], Temp[1]
 
     nDigits = int(np.ceil(np.log10(nCubes)))
 
