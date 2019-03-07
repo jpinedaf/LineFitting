@@ -2,6 +2,7 @@ import pyspeckit
 import pyspeckit.spectrum.models.ammonia as ammonia
 import pyspeckit.spectrum.models.ammonia_constants as nh3con
 from pyspeckit.spectrum.units import SpectroscopicAxis as spaxis
+from string import ascii_lowercase
 import os
 import sys
 import numpy as np
@@ -36,7 +37,6 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
     out_arr = []
     out_y = []
 
-    nDigits = int(np.ceil(np.log10(nCubes)))
     if random_seed:
         np.random.seed(random_seed)
     if noise_class:
@@ -79,37 +79,7 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
     gradX2 = np.random.randn(nCubes, 4) * scale
     gradY2 = np.random.randn(nCubes, 4) * scale
 
-    hdrkwds = {'BUNIT': 'K',
-               'INSTRUME': 'KFPA    ',
-               'BMAJ': 0.008554169991270138,
-               'BMIN': 0.008554169991270138,
-               'TELESCOP': 'GBT',
-               'WCSAXES': 3,
-               'CRPIX1': 2,
-               'CRPIX2': 2,
-               'CRPIX3': 501,
-               'CDELT1': -0.008554169991270138,
-               'CDELT2': 0.008554169991270138,
-               'CDELT3': 5720.0,
-               'CUNIT1': 'deg',
-               'CUNIT2': 'deg',
-               'CUNIT3': 'Hz',
-               'CTYPE1': 'RA---TAN',
-               'CTYPE2': 'DEC--TAN',
-               'CTYPE3': 'FREQ',
-               'CRVAL1': 0.0,
-               'CRVAL2': 0.0,
-               'LONPOLE': 180.0,
-               'LATPOLE': 0.0,
-               'EQUINOX': 2000.0,
-               'SPECSYS': 'LSRK',
-               'RADESYS': 'FK5',
-               'SSYSOBS': 'TOPOCENT'}
-    truekwds = ['NCOMP', 'LOGN1', 'LOGN2', 'VLSR1', 'VLSR2',
-                'SIG1', 'SIG2', 'TKIN1', 'TKIN2']
-
     for i in ProgressBar(range(nCubes)):
-
         Temp = np.array([Temp1, Temp2])
         Width = np.array([Width1, Width2])
         Voff = np.array([Voff1, Voff2])
@@ -126,40 +96,12 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
         Tmax22, Tmax22a, Tmax22b  = results22['Tmax'], results22['Tmax_a'], results22['Tmax_b']
         cube22 = results22['cube']
 
+        write_fits_cube(cube11, nCubes, nComps, i, logN1, logN2, Voff1, Voff2, Width1, Width2, Temp1, Temp2, noise_rms,
+                    Tmax11, Tmax11a, Tmax11b, lineID='11', output_dir=output_dir)
 
-        hdu11 = fits.PrimaryHDU(cube11)
-        for kk in hdrkwds:
-            hdu11.header[kk] = hdrkwds[kk]
-            for kk, vv in zip(truekwds, [nComps[i], logN1[i], logN2[i],
-                                         Voff1[i], Voff2[i], Width1[i], Width2[i],
-                                         Temp1[i], Temp2[i]]):
-                hdu11.header[kk] = vv
-        hdu11.header['TMAX'] = Tmax11
-        hdu11.header['TMAX-1'] = Tmax11a
-        hdu11.header['TMAX-2'] = Tmax11b
-        hdu11.header['RMS'] = noise_rms
-        hdu11.header['CRVAL3'] = 23694495500.0
-        hdu11.header['RESTFRQ'] = 23694495500.0
-        hdu11.writeto(output_dir + '/random_cube_NH3_11_'
-                      + '{0}'.format(i).zfill(nDigits)
-                      + '.fits',
-                      overwrite=True)
-        hdu22 = fits.PrimaryHDU(cube22)
-        for kk in hdrkwds:
-            hdu22.header[kk] = hdrkwds[kk]
-            for kk, vv in zip(truekwds, [nComps[i], logN1[i], logN2[i],
-                                         Voff1[i], Voff2[i], Width1[i], Width2[i],
-                                         Temp1[i], Temp2[i]]):
-                hdu22.header[kk] = vv
-        hdu22.header['TMAX'] = Tmax22
-        hdu22.header['TMAX-1'] = Tmax22a
-        hdu22.header['TMAX-2'] = Tmax22b
-        hdu22.header['RMS'] = noise_rms
-        hdu22.header['CRVAL3'] = 23722633600.0
-        hdu22.header['RESTFRQ'] = 23722633600.0
-        hdu22.writeto(output_dir + '/random_cube_NH3_22_'
-                      + '{0}'.format(i).zfill(nDigits) + '.fits',
-                      overwrite=True)
+        write_fits_cube(cube22, nCubes, nComps, i, logN1, logN2, Voff1, Voff2, Width1, Width2, Temp1, Temp2, noise_rms,
+                    Tmax22, Tmax22a, Tmax22b, lineID='22', output_dir=output_dir)
+
 
         if ml_output:	
             # Grab central pixel and normalize
@@ -185,8 +127,9 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
 	          hf.close()
 
 
+
 def make_cube(nComps, nBorder, i, xarr, Temp, Width, Voff, logN, gradX, gradY, noise_rms):
-    from string import ascii_lowercase
+    # the length of Temp, Width, Voff, logN, gradX, and gradY should match the number of components
 
     results = {}
 
@@ -227,6 +170,60 @@ def make_cube(nComps, nBorder, i, xarr, Temp, Width, Voff, logN, gradX, gradY, n
     results['cube'] = cube
     return results
 
+
+
+def write_fits_cube(cube, nCubes, nComps, i, logN1, logN2, Voff1, Voff2, Width1, Width2, Temp1, Temp2, noise_rms,
+                    Tmax, Tmax_a, Tmax_b, lineID='11', output_dir='random_cubes'):
+
+    nDigits = int(np.ceil(np.log10(nCubes)))
+
+    hdrkwds = {'BUNIT': 'K',
+               'INSTRUME': 'KFPA    ',
+               'BMAJ': 0.008554169991270138,
+               'BMIN': 0.008554169991270138,
+               'TELESCOP': 'GBT',
+               'WCSAXES': 3,
+               'CRPIX1': 2,
+               'CRPIX2': 2,
+               'CRPIX3': 501,
+               'CDELT1': -0.008554169991270138,
+               'CDELT2': 0.008554169991270138,
+               'CDELT3': 5720.0,
+               'CUNIT1': 'deg',
+               'CUNIT2': 'deg',
+               'CUNIT3': 'Hz',
+               'CTYPE1': 'RA---TAN',
+               'CTYPE2': 'DEC--TAN',
+               'CTYPE3': 'FREQ',
+               'CRVAL1': 0.0,
+               'CRVAL2': 0.0,
+               'LONPOLE': 180.0,
+               'LATPOLE': 0.0,
+               'EQUINOX': 2000.0,
+               'SPECSYS': 'LSRK',
+               'RADESYS': 'FK5',
+               'SSYSOBS': 'TOPOCENT'}
+    truekwds = ['NCOMP', 'LOGN1', 'LOGN2', 'VLSR1', 'VLSR2',
+                'SIG1', 'SIG2', 'TKIN1', 'TKIN2']
+
+
+    hdu = fits.PrimaryHDU(cube)
+    for kk in hdrkwds:
+        hdu.header[kk] = hdrkwds[kk]
+        for kk, vv in zip(truekwds, [nComps[i], logN1[i], logN2[i],
+                                     Voff1[i], Voff2[i], Width1[i], Width2[i],
+                                     Temp1[i], Temp2[i]]):
+            hdu.header[kk] = vv
+    hdu.header['TMAX'] = Tmax
+    hdu.header['TMAX-1'] = Tmax_a
+    hdu.header['TMAX-2'] = Tmax_b
+    hdu.header['RMS'] = noise_rms
+    hdu.header['CRVAL3'] = 23694495500.0
+    hdu.header['RESTFRQ'] = 23694495500.0
+    hdu.writeto(output_dir + '/random_cube_NH3_{0}_'.format(lineID)
+                  + '{0}'.format(i).zfill(nDigits)
+                  + '.fits',
+                  overwrite=True)
 
 
 
