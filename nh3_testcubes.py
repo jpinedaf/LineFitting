@@ -14,7 +14,7 @@ from astropy import log
 log.setLevel('ERROR')
 
 
-def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cubes', fix_vlsr=True, random_seed=None,
+def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cubes', random_seed=None,
                    remove_low_sep=False, noise_class=False, linenames=['oneone', 'twotwo']):
 
     xarrList = []
@@ -38,14 +38,63 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
             # use line names at it is for lines above (3,3)
             lineIDList.append(linename)
 
-    if random_seed:
-        np.random.seed(random_seed)
+    nComps, Temp, Width, Voff, logN = generate_parameters(nCubes, random_seed)
 
     if noise_class:
         # Creates a balanced training set with 1comp, noise, and 2comp classes
-        nComps = np.concatenate((np.ones(nCubes/3).astype(int), np.zeros(nCubes/3).astype(int), np.zeros(nCubes/3).astype(int)+2))
-    else:
-        nComps = np.random.choice([1, 2], nCubes)
+        nComps = np.concatenate((np.ones(nCubes / 3).astype(int),
+                                 np.zeros(nCubes / 3).astype(int),
+                                 np.zeros(nCubes / 3).astype(int) + 2))
+
+    if remove_low_sep:
+        Voff1 = Voff[0]
+        Voff2 = Voff[0]
+        # Find where centroids are too close
+        too_close = np.where(np.abs(Voff1 - Voff2) < np.max(np.column_stack((Width1, Width2)), axis=1))
+        # Move the centroids farther apart by the length of largest line width
+        min_Voff = np.min(np.column_stack((Voff2[too_close], Voff1[too_close])), axis=1)
+        max_Voff = np.max(np.column_stack((Voff2[too_close], Voff1[too_close])), axis=1)
+        Voff1[too_close] = min_Voff - np.max(np.column_stack((Width1[too_close], Width2[too_close])), axis=1) / 2.
+        Voff2[too_close] = max_Voff + np.max(np.column_stack((Width1[too_close], Width2[too_close])), axis=1) / 2.
+        Voff = np.array([Voff1, Voff2])
+
+    scale = np.array([[0.2, 0.1, 0.5, 0.01]])
+    gradX1 = np.random.randn(nCubes, 4) * scale
+    gradY1 = np.random.randn(nCubes, 4) * scale
+    gradX2 = np.random.randn(nCubes, 4) * scale
+    gradY2 = np.random.randn(nCubes, 4) * scale
+
+    gradX = np.array([gradX1, gradX2])
+    gradY = np.array([gradY1, gradY2])
+
+    cubes = []
+
+    for xarr, lineID in zip(xarrList, lineIDList):
+        # generate cubes for each lines specified
+        cubeList = []
+
+        print('----------- generating {0} lines ------------'.format(lineID))
+        for i in ProgressBar(range(nCubes)):
+            results = make_cube(nComps[i], nBorder, i, xarr, Temp, Width, Voff, logN, gradX, gradY, noise_rms)
+            write_fits_cube(results['cube'], nCubes, nComps, i,
+                            logN[0], logN[1], Voff[0], Voff[1], Width[0], Width[1], Temp[0], Temp[1],
+                            noise_rms, results['Tmax'], results['Tmax_a'], results['Tmax_b'],
+                            lineID, output_dir=output_dir)
+            cubeList.append(results['cube'])
+
+        cubes.append(cubeList)
+
+    return cubes
+
+
+
+
+def generate_parameters(nCubes, random_seed=None, fix_vlsr=True):
+    # generate random parameters within a pre-defined distributions, for a two velocity slab model
+    if random_seed:
+        np.random.seed(random_seed)
+
+    nComps = np.random.choice([1, 2], nCubes)
 
     Temp1 = 8 + np.random.rand(nCubes) * 17
     Temp2 = 8 + np.random.rand(nCubes) * 17
@@ -55,7 +104,7 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
     else:
         Voff1 = np.random.rand(nCubes) * 5 - 2.5
 
-    Voff2 = Voff1 + np.random.rand(nCubes)* 5 - 2.5
+    Voff2 = Voff1 + np.random.rand(nCubes) * 5 - 2.5
 
     logN1 = 13 + 1.5 * np.random.rand(nCubes)
     logN2 = 13 + 1.5 * np.random.rand(nCubes)
@@ -63,49 +112,15 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
     Width1NT = 0.1 * np.exp(1.5 * np.random.randn(nCubes))
     Width2NT = 0.1 * np.exp(1.5 * np.random.randn(nCubes))
 
-    Width1 = np.sqrt(Width1NT + 0.08**2)
-    Width2 = np.sqrt(Width2NT + 0.08**2)
-    
-    if remove_low_sep:
-        # Find where centroids are too close
-        too_close = np.where(np.abs(Voff1-Voff2)<np.max(np.column_stack((Width1, Width2)), axis=1))
-        # Move the centroids farther apart by the length of largest line width 
-        min_Voff = np.min(np.column_stack((Voff2[too_close],Voff1[too_close])), axis=1)
-        max_Voff = np.max(np.column_stack((Voff2[too_close],Voff1[too_close])), axis=1)
-        Voff1[too_close]=min_Voff-np.max(np.column_stack((Width1[too_close], Width2[too_close])), axis=1)/2.
-        Voff2[too_close]=max_Voff+np.max(np.column_stack((Width1[too_close], Width2[too_close])), axis=1)/2.
-
-    scale = np.array([[0.2, 0.1, 0.5, 0.01]])
-    gradX1 = np.random.randn(nCubes, 4) * scale
-    gradY1 = np.random.randn(nCubes, 4) * scale
-    gradX2 = np.random.randn(nCubes, 4) * scale
-    gradY2 = np.random.randn(nCubes, 4) * scale
+    Width1 = np.sqrt(Width1NT + 0.08 ** 2)
+    Width2 = np.sqrt(Width2NT + 0.08 ** 2)
 
     Temp = np.array([Temp1, Temp2])
     Width = np.array([Width1, Width2])
     Voff = np.array([Voff1, Voff2])
     logN = np.array([logN1, logN2])
-    gradX = np.array([gradX1, gradX2])
-    gradY = np.array([gradY1, gradY2])
 
-    cubes = []
-
-    for xarr, lineID in zip(xarrList, lineIDList):
-
-        cubeList = []
-        print('----------- generating {0} lines ------------'.format(lineID))
-        for i in ProgressBar(range(nCubes)):
-            # generate synthetic cubes
-            results = make_cube(nComps[i], nBorder, i, xarr, Temp, Width, Voff, logN, gradX, gradY, noise_rms)
-            # write the synthetic cubes as fits files
-            write_fits_cube(results['cube'], nCubes, nComps, i, logN1, logN2, Voff1, Voff2, Width1, Width2, Temp1, Temp2,
-                            noise_rms, results['Tmax'], results['Tmax_a'], results['Tmax_b'],
-                            lineID, output_dir=output_dir)
-            cubeList.append(results['cube'])
-
-        cubes.append(cubeList)
-
-    return cubes
+    return nComps, Temp, Width, Voff, logN
 
 
 
