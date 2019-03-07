@@ -40,8 +40,7 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
             lineIDList.append(linename)
 
     nComps, Temp, Width, Voff, logN = generate_parameters(nCubes, random_seed)
-
-    gradX, gradY = generate_vGrad(nCubes, random_seed)
+    gradX, gradY = generate_gradients(nCubes, random_seed)
 
     cubes = []
 
@@ -50,13 +49,16 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
         cubeList = []
         print('----------- generating {0} lines ------------'.format(lineID))
         for i in ProgressBar(range(nCubes)):
-            results = make_cube(nComps[i], nBorder, i, xarr,
-                                Temp, Width, Voff, logN, gradX, gradY, noise_rms)
-            write_fits_cube(results['cube'], nCubes, nComps, i,
-                            logN, Voff, Width, Temp, noise_rms,
+
+            results = make_cube(nComps[i], nBorder, xarr,
+                                Temp[i], Width[i], Voff[i], logN[i], gradX[i], gradY[i], noise_rms)
+
+            write_fits_cube(results['cube'], nCubes, nComps[i], i,
+                            logN[i], Voff[i], Width[i], Temp[i], noise_rms,
                             results['Tmax'], results['Tmax_a'],
                             results['Tmax_b'], lineID,
                             output_dir=output_dir)
+
             cubeList.append(results['cube'])
         cubes.append(cubeList)
 
@@ -64,10 +66,11 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
 
 
 
-def generate_vGrad(nCubes, random_seed=None):
-    # generate random velocity gradient in the X & Y directions to be apply to the cube model
+def generate_gradients(nCubes, random_seed=None):
+    # generate random gradient for temp, sigma, voff, and logN in the X & Y directions
     if random_seed:
         np.random.seed(random_seed)
+    # scaling for the temp, sigma, voff, and logN parameters
     scale = np.array([[0.2, 0.1, 0.5, 0.01]])
     gradX1 = np.random.randn(nCubes, 4) * scale
     gradY1 = np.random.randn(nCubes, 4) * scale
@@ -76,7 +79,8 @@ def generate_vGrad(nCubes, random_seed=None):
 
     gradX = np.array([gradX1, gradX2])
     gradY = np.array([gradY1, gradY2])
-    return gradX, gradY
+
+    return gradX.swapaxes(0, 1), gradY.swapaxes(0, 1)
 
 
 
@@ -106,15 +110,57 @@ def generate_parameters(nCubes, random_seed=None, fix_vlsr=True):
     Width1 = np.sqrt(Width1NT + 0.08 ** 2)
     Width2 = np.sqrt(Width2NT + 0.08 ** 2)
 
-    Temp = np.array([Temp1, Temp2])
-    Width = np.array([Width1, Width2])
-    Voff = np.array([Voff1, Voff2])
-    logN = np.array([logN1, logN2])
+    Temp = np.array([Temp1, Temp2]).swapaxes(0, 1)
+    Width = np.array([Width1, Width2]).swapaxes(0, 1)
+    Voff = np.array([Voff1, Voff2]).swapaxes(0, 1)
+    logN = np.array([logN1, logN2]).swapaxes(0, 1)
 
     return nComps, Temp, Width, Voff, logN
 
 
 
+def make_cube(nComps, nBorder, xarr, Temp, Width, Voff, logN, gradX, gradY, noise_rms):
+    # the length of Temp, Width, Voff, logN, gradX, and gradY should match the number of components
+    xmat, ymat = np.indices((2 * nBorder + 1, 2 * nBorder + 1))
+    cube = np.zeros((xarr.shape[0], 2 * nBorder + 1, 2 * nBorder + 1))
+
+    results = {}
+    results['Tmax_a'], results['Tmax_b'] = (0,) * 2
+
+    for xx, yy in zip(xmat.flatten(), ymat.flatten()):
+
+        spec = np.zeros(cube.shape[0])
+
+        for j in range(nComps):
+            # define parameters
+            T = Temp[j] * (1 + gradX[j][0] * (xx - 1) + gradY[j][0] * (yy - 1)) + 5
+            if T < 2.74:
+                T = 2.74
+            W = np.abs(Width[j] * (1 + gradX[j][1] * (xx - 1) + gradY[j][1] * (yy - 1)))
+            V = Voff[j] + (gradX[j][2] * (xx - 1) + gradY[j][2] * (yy - 1))
+            N = logN[j] * (1 + gradX[j][3] * (xx - 1) + gradY[j][3] * (yy - 1))
+
+            # generate spectrum
+            spec_j = ammonia.cold_ammonia(xarr, T, ntot=N, width=W, xoff_v=V)
+
+            if (xx == nBorder) and (yy == nBorder):
+                Tmaxj = np.max(spec_j)
+                results['Tmax_{}'.format(ascii_lowercase[j])] = Tmaxj
+
+            # add each component to the total spectrum
+            spec = spec + spec_j
+
+        cube[:, yy, xx] = spec
+        if (xx == nBorder) and (yy == nBorder):
+            Tmax = np.max(spec)
+            results['Tmax'] = Tmax
+
+    # should we add noise independently on individual spectrum to avoid correlated noise across pixels?
+    cube += np.random.randn(*cube.shape) * noise_rms
+    results['cube'] = cube
+    return results
+
+'''
 def make_cube(nComps, nBorder, i, xarr, Temp, Width, Voff, logN, gradX, gradY, noise_rms):
     # the length of Temp, Width, Voff, logN, gradX, and gradY should match the number of components
     xmat, ymat = np.indices((2 * nBorder + 1, 2 * nBorder + 1))
@@ -154,7 +200,7 @@ def make_cube(nComps, nBorder, i, xarr, Temp, Width, Voff, logN, gradX, gradY, n
     cube += np.random.randn(*cube.shape) * noise_rms
     results['cube'] = cube
     return results
-
+'''
 
 
 def write_fits_cube(cube, nCubes, nComps, i, logN, Voff, Width, Temp, noise_rms,
@@ -205,9 +251,9 @@ def write_fits_cube(cube, nCubes, nComps, i, logN, Voff, Width, Temp, noise_rms,
     hdu = fits.PrimaryHDU(cube)
     for kk in hdrkwds:
         hdu.header[kk] = hdrkwds[kk]
-        for kk, vv in zip(truekwds, [nComps[i], logN1[i], logN2[i],
-                                     Voff1[i], Voff2[i], Width1[i], Width2[i],
-                                     Temp1[i], Temp2[i]]):
+        for kk, vv in zip(truekwds, [nComps, logN1, logN2,
+                                     Voff1, Voff2, Width1, Width2,
+                                     Temp1, Temp2]):
             hdu.header[kk] = vv
     hdu.header['TMAX'] = Tmax
     hdu.header['TMAX-1'] = Tmax_a
