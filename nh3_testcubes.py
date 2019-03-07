@@ -27,28 +27,19 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
                       velocity_convention='radio', refX_unit='GHz')
         xarrList.append(xarr)
 
-        # specify the ID fore each line to appear in  saved fits files
-        if linename is 'oneone':
-            lineIDList.append('11')
-        elif linename is 'twotwo':
-            lineIDList.append('22')
-        else:
-            # use line names at it is for lines above (3,3)
-            lineIDList.append(linename)
-
     # generate random parameters for nCubes
     nComps, Temp, Width, Voff, logN = generate_parameters(nCubes, random_seed)
     gradX, gradY = generate_gradients(nCubes, random_seed)
 
     cubes = []
 
-    for xarr, lineID in zip(xarrList, lineIDList):
+    for xarr, linename in zip(xarrList, linenames):
         # generate cubes for each line specified
         cubeList = []
-        print('----------- generating {0} lines ------------'.format(lineID))
+        print('----------- generating {0} lines ------------'.format(linename))
         for i in ProgressBar(range(nCubes)):
             cube_i = make_and_write(nCubes, nComps[i], i, nBorder, xarr, Temp[i], Width[i], Voff[i], logN[i], gradX[i], gradY[i]
-                           , noise_rms, lineID, output_dir)
+                           , noise_rms, linename, output_dir)
 
             cubeList.append(cube_i)
         cubes.append(cubeList)
@@ -57,13 +48,13 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
 
 
 
-def make_and_write(nCubes, nComp, i, nBorder, xarr, T, W, V, N, grdX, grdY, noise_rms, lineID, output_dir):
+def make_and_write(nCubes, nComp, i, nBorder, xarr, T, W, V, N, grdX, grdY, noise_rms, linename, output_dir):
     # wrapper for make_cube() and write_fits_cube()
 
     results = make_cube(nComp, nBorder, xarr, T, W, V, N, grdX, grdY, noise_rms)
 
     write_fits_cube(results['cube'], nCubes, nComp, i, N, V, W, T, noise_rms,
-                    results['Tmax'], results['Tmax_a'], results['Tmax_b'], lineID,
+                    results['Tmax'], results['Tmax_a'], results['Tmax_b'], linename,
                     output_dir)
 
     return results['cube']
@@ -168,7 +159,7 @@ def make_cube(nComps, nBorder, xarr, Temp, Width, Voff, logN, gradX, gradY, nois
 
 
 def write_fits_cube(cube, nCubes, nComps, i, logN, Voff, Width, Temp, noise_rms,
-                    Tmax, Tmax_a, Tmax_b, lineID='11', output_dir='random_cubes'):
+                    Tmax, Tmax_a, Tmax_b, linename, output_dir='random_cubes'):
     """
     This places nCubes random cubes into the specified output directory
     """
@@ -222,8 +213,18 @@ def write_fits_cube(cube, nCubes, nComps, i, logN, Voff, Width, Temp, noise_rms,
     hdu.header['TMAX-1'] = Tmax_a
     hdu.header['TMAX-2'] = Tmax_b
     hdu.header['RMS'] = noise_rms
-    hdu.header['CRVAL3'] = 23694495500.0
-    hdu.header['RESTFRQ'] = 23694495500.0
+    hdu.header['CRVAL3'] = nh3con.freq_dict[linename]
+    hdu.header['RESTFRQ'] = nh3con.freq_dict[linename]
+
+    # specify the ID fore each line to appear in  saved fits files
+    if linename is 'oneone':
+        lineID = '11'
+    elif linename is 'twotwo':
+        lineID = '22'
+    else:
+        # use line names at it is for lines above (3,3)
+        lineID = linename
+
     hdu.writeto(output_dir + '/random_cube_NH3_{0}_'.format(lineID)
                   + '{0}'.format(i).zfill(nDigits)
                   + '.fits',
