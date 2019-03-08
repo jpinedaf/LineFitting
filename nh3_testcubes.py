@@ -16,7 +16,6 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
                    linenames=['oneone', 'twotwo']):
 
     xarrList = []
-    lineIDList = []
 
     for linename in linenames:
         # generate spectral axis for each ammonia lines
@@ -31,20 +30,12 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
     nComps, Temp, Width, Voff, logN = generate_parameters(nCubes, random_seed)
     gradX, gradY = generate_gradients(nCubes, random_seed)
 
-    cubes = []
-
     for xarr, linename in zip(xarrList, linenames):
         # generate cubes for each line specified
-        cubeList = []
         print('----------- generating {0} lines ------------'.format(linename))
         for i in ProgressBar(range(nCubes)):
-            cube_i = make_and_write(nCubes, nComps[i], i, nBorder, xarr, Temp[i], Width[i], Voff[i], logN[i], gradX[i], gradY[i]
+            make_and_write(nCubes, nComps[i], i, nBorder, xarr, Temp[i], Width[i], Voff[i], logN[i], gradX[i], gradY[i]
                            , noise_rms, linename, output_dir)
-
-            cubeList.append(cube_i)
-        cubes.append(cubeList)
-
-    return cubes
 
 
 
@@ -56,8 +47,6 @@ def make_and_write(nCubes, nComp, i, nBorder, xarr, T, W, V, N, grdX, grdY, nois
     write_fits_cube(results['cube'], nCubes, nComp, i, N, V, W, T, noise_rms,
                     results['Tmax'], results['Tmax_a'], results['Tmax_b'], linename,
                     output_dir)
-
-    return results['cube']
 
 
 
