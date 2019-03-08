@@ -1,18 +1,18 @@
 #=======================================================================================================================
 
-# an example file on how to build special test/training cubes using nh3_testcube.py
+# a multiprocessing wrapper for nh3_testcubes.py
 
 #=======================================================================================================================
 import numpy as np
 import pyspeckit.spectrum.models.ammonia_constants as nh3con
 from pyspeckit.spectrum.units import SpectroscopicAxis as spaxis
-
 from multiprocessing import Pool, cpu_count
 import tqdm
 
 import nh3_testcubes as testcubes
 
 class TestSet:
+    # store parameters generated for the test set
     def __init__(self, nCubes, nComps, nBorder, xarr, paras, grads, noise_rms, linename, output_dir):
         self.nCubes = nCubes
         self.nComps = nComps
@@ -26,11 +26,12 @@ class TestSet:
 
 
 def make_n_write(i):
-        testcubes.make_and_write(tset.nCubes, tset.nComps[i], i, tset.nBorder, tset.xarr,
-                                 tset.paras['Temp'][i], tset.paras['Width'][i],
-                                 tset.paras['Voff'][i], tset.paras['logN'][i],
-                                 tset.grads['gradX'][i], tset.grads['gradY'][i],
-                                 tset.noise_rms, tset.linename, tset.output_dir)
+    # the wrapper function that will be multi-processed
+    testcubes.make_and_write(tset.nCubes, tset.nComps[i], i, tset.nBorder, tset.xarr,
+                             tset.paras['Temp'][i], tset.paras['Width'][i],
+                             tset.paras['Voff'][i], tset.paras['logN'][i],
+                             tset.grads['gradX'][i], tset.grads['gradY'][i],
+                             tset.noise_rms, tset.linename, tset.output_dir)
 
 
 def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cubes', random_seed=None,
