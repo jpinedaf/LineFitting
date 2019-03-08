@@ -140,7 +140,6 @@ def make_cube(nComps, nBorder, xarr, Temp, Width, Voff, logN, gradX, gradY, nois
             Tmax = np.max(spec)
             results['Tmax'] = Tmax
 
-    # should we add noise independently on individual spectrum to avoid correlated noise across pixels?
     cube += np.random.randn(*cube.shape) * noise_rms
     results['cube'] = cube
     return results
