@@ -207,9 +207,9 @@ def write_fits_cube(cube, nCubes, nComps, i, logN, Voff, Width, Temp, noise_rms,
     hdu.header['RESTFRQ'] = nh3con.freq_dict[linename]
 
     # specify the ID fore each line to appear in  saved fits files
-    if linename is 'oneone':
+    if linename == 'oneone':
         lineID = '11'
-    elif linename is 'twotwo':
+    elif linename == 'twotwo':
         lineID = '22'
     else:
         # use line names at it is for lines above (3,3)
