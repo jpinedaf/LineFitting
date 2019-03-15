@@ -2,7 +2,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 from sklearn.metrics import confusion_matrix
 
-
+#======================================================================================================================#
+# For plotting confusion matrix
 
 def plot_cmatrix_wrapper(y_true, y_pred, classes, **kwargs):
     """
@@ -19,7 +20,6 @@ def plot_cmatrix_wrapper(y_true, y_pred, classes, **kwargs):
     """
     cm = confusion_matrix(y_true, y_pred)
     plot_confusion_matrix(cm, classes, **kwargs)
-
 
 
 def plot_confusion_matrix(cm, classes, normalize=False, title=None, cmap=plt.cm.Blues, ax=None, verbose=False):
@@ -67,3 +67,37 @@ def plot_confusion_matrix(cm, classes, normalize=False, title=None, cmap=plt.cm.
 
     ax.set_ylabel('True label')
     ax.set_xlabel('Predicted label')
+
+#======================================================================================================================#
+
+def plot_success_rate(X, isTruePos, nbins=30, range=None, ax=None, **kwargs):
+    """
+    Plots the success rate of true positive identifications as a function of X values
+    :param X:
+        [array] Parameter to be plotted on the x-axis
+    :param Y:
+        [array] Boolean values of whether or not a true positive has been successfully identified
+    :param nbins:
+        [int] Number of bins to bin the X into
+    :param range:
+        [int] Range of values for X to be binned into
+    :param ax:
+    :param title:
+    :param kwargs:
+    :return:
+    """
+    from scipy.stats import binned_statistic
+
+    # mean value of isTruePos (boolean) is the fraction of true postive id's out of all the id's
+    mean = binned_statistic(x=X, values=isTruePos, statistic=np.nanmean, bins=nbins, range=range)
+
+    bin_edges = mean.bin_edges
+    bin_width = (bin_edges[1] - bin_edges[0])
+    bin_centers = bin_edges[1:] - bin_width / 2
+
+    if ax is None:
+        ax = plt.subplot(1, 1, 1)
+
+    ax.plot(bin_centers, mean.statistic, **kwargs)
+
+    return ax
