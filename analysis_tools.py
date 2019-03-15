@@ -1,6 +1,32 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from sklearn.metrics import confusion_matrix
+from astropy.table import Table
+
+#======================================================================================================================#
+
+class TestResults:
+
+    def __init__(self, results_table):
+        self.table = Table.read(results_table, format='ascii')
+        self.true_vsep = np.abs(self.table['VLSR1'] - self.table['VLSR2'])
+        self.mask_2v_good = self.table['NCOMP'] == 2
+        self.is2compFit = self.table['NCOMP_FIT'] == 2
+
+    def plot_cmatrix(self, **kwargs):
+        if kwargs is None:
+            kwargs = {}
+
+        if not 'classes' in kwargs:
+            kwargs['classes'] = ["1 comp", "2 comp"]
+        if not 'title' in kwargs:
+            kwargs['title'] = 'All pixels'
+        if not 'normalize' in kwargs:
+            kwargs['normalize'] = True
+
+        plot_cmatrix_wrapper(self.table['NCOMP'], self.table['NCOMP_FIT'], **kwargs)
+
+
 
 #======================================================================================================================#
 # For plotting confusion matrix
@@ -101,3 +127,5 @@ def plot_success_rate(X, isTruePos, nbins=30, range=None, ax=None, **kwargs):
     ax.plot(bin_centers, mean.statistic, **kwargs)
 
     return ax
+
+
