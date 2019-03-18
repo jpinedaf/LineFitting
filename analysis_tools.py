@@ -12,15 +12,19 @@ class TestResults:
     def __init__(self, results_table):
         self.table = Table.read(results_table, format='ascii')
         self.mask_1v_truepos = np.logical_and(self.table['NCOMP'] == 1, self.table['NCOMP_FIT'] == 1)
+
         self.mask_2v_good = self.table['NCOMP'] == 2
         self.is2compFit = self.table['NCOMP_FIT'] == 2
+        self.mask_2v_truepos = np.logical_and(self.mask_2v_good, self.is2compFit)
 
         self.table['true_vsep'] = np.abs(self.table['VLSR1'] - self.table['VLSR2'])
         self.table['snr'] = self.table['TMAX']/self.table['RMS']
         self.table['sig_min'] = np.nanmin(np.array([self.table['SIG1'], self.table['SIG2']]), axis=0)
         self.table['sig_max'] = np.nanmax(np.array([self.table['SIG1'], self.table['SIG2']]), axis=0)
         self.table['sig_ratio'] = self.table['sig_min']/self.table['sig_max']
-        self.table['true_vErr'] = self.table['VLSR1'] - self.table['VLSR1_FIT']
+
+        self.table['true_vErr1'] = self.table['VLSR1'] - self.table['VLSR1_FIT']
+        self.table['true_vErr2'] = self.table['VLSR2'] - self.table['VLSR2_FIT']
 
 
     def plot_cmatrix(self, **kwargs):
@@ -90,7 +94,8 @@ class TestResults:
         if qname is not "":
             ax.legend(legtext, frameon=False)
 
-    def plot_error(self, X_Key, Y_Key, mask=None, range=None, ax=None):
+
+    def plot_error(self, X_Key, Y_Key, mask=None, range=None, ax=None, bins=30):
         X = self.table[X_Key]
         Y = self.table[Y_Key]
 
@@ -98,7 +103,41 @@ class TestResults:
             X = X[mask]
             Y = Y[mask]
 
-        plot_err(X, Y, Err=None, bins=30, range=range, ax=ax, title=None)
+        plot_err(X.ravel(), Y.ravel(), Err=None, bins=bins, range=range, ax=ax, title=None)
+
+
+    def sort_2comps(self):
+        # currently sorted proximity to the true vlsr value (which has bias that I'll need to fix
+
+        def sort_comps2(swapmask, compAry):
+            compAry[0][swapmask], compAry[1][swapmask] = compAry[1][swapmask], compAry[0][swapmask]
+
+        VLSR_m = np.array([self.table['VLSR1_FIT'], self.table['VLSR2_FIT']])#.copy()
+        VLSR_t = np.array([self.table['VLSR1'], self.table['VLSR2']])#.copy()
+        diffVLSR1 = np.abs(VLSR_t[0] - VLSR_m[0])
+        diffVLSR2 = np.abs(VLSR_t[0] - VLSR_m[1])
+
+        swapmask = diffVLSR1 > diffVLSR2
+        print swapmask.shape
+        # only apply to where two component true postives exists
+        mask = np.logical_and(self.mask_2v_good, self.is2compFit)
+        swapmask[~mask] = False
+
+        # note: the following list is not complete yet, it only sorts fitted vlsr & sigma
+        sortList = []
+        sortList.append([self.table['VLSR1_FIT'], self.table['VLSR2_FIT']])
+        sortList.append([self.table['SIG1_FIT'], self.table['SIG2_FIT']])
+        sortList.append([(self.table['eVLSR1_FIT']), (self.table['eVLSR2_FIT'])])
+        sortList.append([(self.table['eSIG1_FIT']), (self.table['eSIG2_FIT'])])
+        #sortList.append()
+
+        for i, q in enumerate(sortList):
+            sort_comps2(swapmask, sortList[i])
+
+        # recalculate some values
+        self.table['true_vErr1'] = self.table['VLSR1'] - self.table['VLSR1_FIT']
+        self.table['true_vErr2'] = self.table['VLSR2'] - self.table['VLSR2_FIT']
+
 
 
 #======================================================================================================================#
@@ -237,6 +276,12 @@ def plot_err(X, Y, Err=None, bins=30, range=None, ax=None, title=None):
 
     return ax
 
+
+#======================================================================================================================#
+# analysis (non-plotting) functions
+
+
+
 #======================================================================================================================#
 # generic plotting functions
 
@@ -258,4 +303,6 @@ def plot_fillscat(med, std, bin_edges, ax=None, title=None):
         ax.set_title(title)
 
     return ax
+
+
 
