@@ -1,48 +1,78 @@
 import pyspeckit.spectrum.models.ammonia as ammonia
 import pyspeckit.spectrum.models.ammonia_constants as nh3con
 from pyspeckit.spectrum.units import SpectroscopicAxis as spaxis
+from string import ascii_lowercase
 import os
 import sys
 import numpy as np
-import astropy.units as u
 from astropy.io import fits
-from spectral_cube import SpectralCube
 from astropy.utils.console import ProgressBar
 from astropy import log
-import h5py
+from astropy import units as u
+from astropy import constants
 log.setLevel('ERROR')
 
-def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
-                   output_dir='random_cubes', fix_vlsr=True,
-                   random_seed=None, remove_low_sep=False, noise_class=False, ml_output=False):
-    """
-    This places nCubes random cubes into the specified output directory
-    """
 
-    if not os.path.isdir(output_dir):
-        os.mkdir(output_dir)
-    xarr11 = spaxis((np.linspace(-500, 499, 1000) * 5.72e-6
-                     + nh3con.freq_dict['oneone'] / 1e9),
-                    unit='GHz',
-                    refX=nh3con.freq_dict['oneone'] / 1e9,
-                    velocity_convention='radio', refX_unit='GHz')
-    xarr22 = spaxis((np.linspace(-500, 499, 1000) * 5.72e-6
-                     + nh3con.freq_dict['twotwo'] / 1e9), unit='GHz',
-                    refX=nh3con.freq_dict['twotwo'] / 1e9,
-                    velocity_convention='radio', refX_unit='GHz')
 
-    # Create holders for ml_output
-    out_arr = []
-    out_y = []
+def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cubes', random_seed=None,
+                   linenames=['oneone', 'twotwo']):
 
-    nDigits = int(np.ceil(np.log10(nCubes)))
+    xarrList = []
+
+    for linename in linenames:
+        # generate spectral axis for each ammonia lines
+        xarr = generate_xarr(linename)
+        xarrList.append(xarr)
+
+    # generate random parameters for nCubes
+    nComps, Temp, Width, Voff, logN = generate_parameters(nCubes, random_seed)
+    gradX, gradY = generate_gradients(nCubes, random_seed)
+
+    for xarr, linename in zip(xarrList, linenames):
+        # generate cubes for each line specified
+        print('----------- generating {0} lines ------------'.format(linename))
+        for i in ProgressBar(range(nCubes)):
+            make_and_write(nCubes, nComps[i], i, nBorder, xarr, Temp[i], Width[i], Voff[i], logN[i], gradX[i], gradY[i]
+                           , noise_rms, linename, output_dir)
+
+
+
+def make_and_write(nCubes, nComp, i, nBorder, xarr, T, W, V, N, grdX, grdY, noise_rms, linename, output_dir):
+    # wrapper for make_cube() and write_fits_cube()
+
+    results = make_cube(nComp, nBorder, xarr, T, W, V, N, grdX, grdY, noise_rms)
+
+    write_fits_cube(results['cube'], nCubes, nComp, i, N, V, W, T, noise_rms,
+                    results['Tmax'], results['Tmax_a'], results['Tmax_b'], linename,
+                    output_dir)
+
+
+
+def generate_gradients(nCubes, random_seed=None):
+    # generate random gradient for temp, sigma, voff, and logN in the X & Y directions
     if random_seed:
         np.random.seed(random_seed)
-    if noise_class:
-        # Creates a balanced training set with 1comp, noise, and 2comp classes
-        nComps = np.concatenate((np.ones(nCubes/3).astype(int), np.zeros(nCubes/3).astype(int), np.zeros(nCubes/3).astype(int)+2))
-    else:
-        nComps = np.random.choice([1, 2], nCubes)
+    # scaling for the temp, sigma, voff, and logN parameters
+    scale = np.array([[0.2, 0.1, 0.5, 0.01]])
+    # 0.5 km/s/pix is about 39.7 km/s/pc at 260pc away at 10"/pix
+    gradX1 = np.random.randn(nCubes, 4) * scale
+    gradY1 = np.random.randn(nCubes, 4) * scale
+    gradX2 = np.random.randn(nCubes, 4) * scale
+    gradY2 = np.random.randn(nCubes, 4) * scale
+
+    gradX = np.array([gradX1, gradX2])
+    gradY = np.array([gradY1, gradY2])
+
+    return gradX.swapaxes(0, 1), gradY.swapaxes(0, 1)
+
+
+
+def generate_parameters(nCubes, random_seed=None, fix_vlsr=True):
+    # generate random parameters within a pre-defined distributions, for a two velocity slab model
+    if random_seed:
+        np.random.seed(random_seed)
+
+    nComps = np.random.choice([1, 2], nCubes)
 
     Temp1 = 8 + np.random.rand(nCubes) * 17
     Temp2 = 8 + np.random.rand(nCubes) * 17
@@ -60,33 +90,86 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
     Width1NT = 0.1 * np.exp(1.5 * np.random.randn(nCubes))
     Width2NT = 0.1 * np.exp(1.5 * np.random.randn(nCubes))
 
-    # Width1 = 0.08 + 1.0 * np.random.rand(nCubes)
-    # Width2 = 0.08 + 1.0 * np.random.rand(nCubes)
+    Width1 = np.sqrt(Width1NT + 0.08 ** 2)
+    Width2 = np.sqrt(Width2NT + 0.08 ** 2)
 
-    Width1 = np.sqrt(Width1NT + 0.08**2)
-    Width2 = np.sqrt(Width2NT + 0.08**2)
-    
-    if remove_low_sep:
-        # Find where centroids are too close
-        too_close = np.where(np.abs(Voff1-Voff2)<np.max(np.column_stack((Width1, Width2)), axis=1))
-        # Move the centroids farther apart by the length of largest line width 
-        min_Voff = np.min(np.column_stack((Voff2[too_close],Voff1[too_close])), axis=1)
-        max_Voff = np.max(np.column_stack((Voff2[too_close],Voff1[too_close])), axis=1)
-        Voff1[too_close]=min_Voff-np.max(np.column_stack((Width1[too_close], Width2[too_close])), axis=1)/2.
-        Voff2[too_close]=max_Voff+np.max(np.column_stack((Width1[too_close], Width2[too_close])), axis=1)/2.
+    Temp = np.array([Temp1, Temp2]).swapaxes(0, 1)
+    Width = np.array([Width1, Width2]).swapaxes(0, 1)
+    Voff = np.array([Voff1, Voff2]).swapaxes(0, 1)
+    logN = np.array([logN1, logN2]).swapaxes(0, 1)
 
-    scale = np.array([[0.2, 0.1, 0.5, 0.01]])
-    gradX1 = np.random.randn(nCubes, 4) * scale
-    gradY1 = np.random.randn(nCubes, 4) * scale
-    gradX2 = np.random.randn(nCubes, 4) * scale
-    gradY2 = np.random.randn(nCubes, 4) * scale
+    return nComps, Temp, Width, Voff, logN
 
-    params1 = [{'ntot':14,
-                'width':1,
-                'xoff_v':0.0}] * nCubes
-    params2 = [{'ntot':14,
-                'width':1,
-                'xoff_v':0.0}] * nCubes
+
+def generate_xarr(linename):
+    # generate SpectroscopicAxis objects
+    channelwidth = (5.72 * u.kHz / (nh3con.freq_dict[linename] * u.Hz)) * constants.c
+
+    xarr = spaxis(np.arange(-500, 500) * channelwidth,
+                  unit='GHz',
+                  refX=nh3con.freq_dict[linename] / 1e9,
+                  velocity_convention='radio', refX_unit='GHz')
+    return xarr
+
+
+def make_cube(nComps, nBorder, xarr, Temp, Width, Voff, logN, gradX, gradY, noise_rms):
+    # the length of Temp, Width, Voff, logN, gradX, and gradY should match the number of components
+    xmat, ymat = np.indices((2 * nBorder + 1, 2 * nBorder + 1))
+    cube = np.zeros((xarr.shape[0], 2 * nBorder + 1, 2 * nBorder + 1))
+
+    results = {}
+    results['Tmax_a'], results['Tmax_b'] = (0,) * 2
+
+    for xx, yy in zip(xmat.flatten(), ymat.flatten()):
+
+        spec = np.zeros(cube.shape[0])
+
+        for j in range(nComps):
+            # define parameters
+            T = Temp[j] * (1 + gradX[j][0] * (xx - 1) + gradY[j][0] * (yy - 1)) + 5
+            if T < 2.74:
+                T = 2.74
+            W = np.abs(Width[j] * (1 + gradX[j][1] * (xx - 1) + gradY[j][1] * (yy - 1)))
+            V = Voff[j] + (gradX[j][2] * (xx - 1) + gradY[j][2] * (yy - 1))
+            N = logN[j] * (1 + gradX[j][3] * (xx - 1) + gradY[j][3] * (yy - 1))
+
+            # generate spectrum
+            spec_j = ammonia.cold_ammonia(xarr, T, ntot=N, width=W, xoff_v=V)
+
+            if (xx == nBorder) and (yy == nBorder):
+                Tmaxj = np.max(spec_j)
+                results['Tmax_{}'.format(ascii_lowercase[j])] = Tmaxj
+
+            # add each component to the total spectrum
+            spec = spec + spec_j
+
+        cube[:, yy, xx] = spec
+        if (xx == nBorder) and (yy == nBorder):
+            Tmax = np.max(spec)
+            results['Tmax'] = Tmax
+
+    cube += np.random.randn(*cube.shape) * noise_rms
+    results['cube'] = cube
+    return results
+
+
+
+def write_fits_cube(cube, nCubes, nComps, i, logN, Voff, Width, Temp, noise_rms,
+                    Tmax, Tmax_a, Tmax_b, linename, output_dir='random_cubes'):
+    """
+    Function to write a test cube as a fits file
+    Note: only currently compatible with nComp <= 2
+    """
+    if not os.path.isdir(output_dir):
+        #  This places nCubes random cubes into the specified output directory
+        os.mkdir(output_dir)
+
+    logN1, logN2 = logN[0], logN[1]
+    Voff1, Voff2 = Voff[0], Voff[1]
+    Width1, Width2 = Width[0], Width[1]
+    Temp1, Temp2 = Temp[0], Temp[1]
+
+    nDigits = int(np.ceil(np.log10(nCubes)))
 
     hdrkwds = {'BUNIT': 'K',
                'INSTRUME': 'KFPA    ',
@@ -117,135 +200,35 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1,
     truekwds = ['NCOMP', 'LOGN1', 'LOGN2', 'VLSR1', 'VLSR2',
                 'SIG1', 'SIG2', 'TKIN1', 'TKIN2']
 
-    for i in ProgressBar(range(nCubes)):
-        xmat, ymat = np.indices((2 * nBorder + 1, 2 * nBorder + 1))
-        cube11 = np.zeros((xarr11.shape[0], 2 * nBorder + 1, 2 * nBorder + 1))
-        cube22 = np.zeros((xarr22.shape[0], 2 * nBorder + 1, 2 * nBorder + 1))
-        Tmax11a, Tmax11b, Tmax22a, Tmax22b = (0,) * 4
-        for xx, yy in zip(xmat.flatten(), ymat.flatten()):
-            T1 = Temp1[i] * (1 + gradX1[i, 0] * (xx - 1)
-                             + gradY1[i, 0] * (yy - 1)) + 5
-            T2 = Temp2[i] * (1 + gradX2[i, 0] * (xx - 1)
-                             + gradY2[i, 0] * (yy - 1)) + 5
-            if T1 < 2.74:
-                T1 = 2.74
-            if T2 < 2.74:
-                T2 = 2.74
-            W1 = np.abs(Width1[i] * (1 + gradX1[i, 1] * (xx - 1)
-                                     + gradY1[i, 1] * (yy - 1)))
-            W2 = np.abs(Width2[i] * (1 + gradX2[i, 1] * (xx - 1)
-                                     + gradY2[i, 1] * (yy - 1)))
-            V1 = Voff1[i] + (gradX1[i, 2] * (xx - 1) + gradY1[i, 2] * (yy - 1))
-            V2 = Voff2[i] + (gradX2[i, 2] * (xx - 1) + gradY2[i, 2] * (yy - 1))
-            N1 = logN1[i] * (1 + gradX1[i, 3] * (xx - 1)
-                             + gradY1[i, 3] * (yy - 1))
-            N2 = logN2[i] * (1 + gradX2[i, 3] * (xx - 1)
-                             + gradY2[i, 3] * (yy - 1))
-            if nComps[i] == 1:
-                spec11 = ammonia.cold_ammonia(xarr11, T1,
-                                              ntot=N1,
-                                              width=W1,
-                                              xoff_v=V1)
-                spec22 = ammonia.cold_ammonia(xarr22, T1,
-                                              ntot=N1,
-                                              width=W1,
-                                              xoff_v=V1)
-                if (xx == nBorder) and (yy == nBorder):
-                    Tmax11a = np.max(spec11)
-                    Tmax22a = np.max(spec22)
-                    Tmax11 = np.max(spec11)
-                    Tmax22 = np.max(spec22)
-            if nComps[i] == 2:
-                spec11a = ammonia.cold_ammonia(xarr11, T1,
-                                               ntot=N1,
-                                               width=W1,
-                                               xoff_v=V1)
-                spec11b = ammonia.cold_ammonia(xarr11, T2,
-                                                 ntot=N2,
-                                                 width=W2,
-                                                 xoff_v=V2)
-                spec11 = spec11a + spec11b
+    hdu = fits.PrimaryHDU(cube)
+    for kk in hdrkwds:
+        hdu.header[kk] = hdrkwds[kk]
+        for kk, vv in zip(truekwds, [nComps, logN1, logN2,
+                                     Voff1, Voff2, Width1, Width2,
+                                     Temp1, Temp2]):
+            hdu.header[kk] = vv
+    hdu.header['TMAX'] = Tmax
+    hdu.header['TMAX-1'] = Tmax_a
+    hdu.header['TMAX-2'] = Tmax_b
+    hdu.header['RMS'] = noise_rms
+    hdu.header['CRVAL3'] = nh3con.freq_dict[linename]
+    hdu.header['RESTFRQ'] = nh3con.freq_dict[linename]
 
-                spec22a = ammonia.cold_ammonia(xarr22, T1,
-                                               ntot=N1,
-                                               width=W1,
-                                               xoff_v=V1)
-                spec22b = ammonia.cold_ammonia(xarr22, T2,
-                                                 ntot=N2,
-                                                 width=W2,
-                                                 xoff_v=V2)
-                spec22 = spec22a + spec22b
-                if (xx == nBorder) and (yy == nBorder):
-                    Tmax11a = np.max(spec11a)
-                    Tmax11b = np.max(spec11b)
-                    Tmax22a = np.max(spec22a)
-                    Tmax22b = np.max(spec22b)
-                    Tmax11 = np.max(spec11)
-                    Tmax22 = np.max(spec22)
-            if ncomps[i]==0:
-                cube11[:, yy, xx] = numpy.zeros(cube11.shape[0])
-                cube22[:, yy, xx] = numpy.zeros(cube22.shape[0])
-            else:
-                cube11[:, yy, xx] = spec11
-                cube22[:, yy, xx] = spec22
-        cube11 += np.random.randn(*cube11.shape) * noise_rms
-        cube22 += np.random.randn(*cube22.shape) * noise_rms
-        hdu11 = fits.PrimaryHDU(cube11)
-        for kk in hdrkwds:
-            hdu11.header[kk] = hdrkwds[kk]
-            for kk, vv in zip(truekwds, [nComps[i], logN1[i], logN2[i],
-                                         Voff1[i], Voff2[i], Width1[i], Width2[i],
-                                         Temp1[i], Temp2[i]]):
-                hdu11.header[kk] = vv
-        hdu11.header['TMAX'] = Tmax11
-        hdu11.header['TMAX-1'] = Tmax11a
-        hdu11.header['TMAX-2'] = Tmax11b
-        hdu11.header['RMS'] = noise_rms
-        hdu11.header['CRVAL3'] = 23694495500.0
-        hdu11.header['RESTFRQ'] = 23694495500.0
-        hdu11.writeto(output_dir + '/random_cube_NH3_11_'
-                      + '{0}'.format(i).zfill(nDigits)
-                      + '.fits',
-                      overwrite=True)
-        hdu22 = fits.PrimaryHDU(cube22)
-        for kk in hdrkwds:
-            hdu22.header[kk] = hdrkwds[kk]
-            for kk, vv in zip(truekwds, [nComps[i], logN1[i], logN2[i],
-                                         Voff1[i], Voff2[i], Width1[i], Width2[i],
-                                         Temp1[i], Temp2[i]]):
-                hdu22.header[kk] = vv
-        hdu22.header['TMAX'] = Tmax22
-        hdu22.header['TMAX-1'] = Tmax22a
-        hdu22.header['TMAX-2'] = Tmax22b
-        hdu22.header['RMS'] = noise_rms
-        hdu22.header['CRVAL3'] = 23722633600.0
-        hdu22.header['RESTFRQ'] = 23722633600.0
-        hdu22.writeto(output_dir + '/random_cube_NH3_22_'
-                      + '{0}'.format(i).zfill(nDigits) + '.fits',
-                      overwrite=True)
+    # specify the ID fore each line to appear in  saved fits files
+    if linename == 'oneone':
+        lineID = '11'
+    elif linename == 'twotwo':
+        lineID = '22'
+    else:
+        # use line names at it is for lines above (3,3)
+        lineID = linename
 
-        if ml_output:	
-            # Grab central pixel and normalize
-            loc11 = cube11[:,1,1].reshape(1000,1)
-            loc11 = loc11/np.max(loc11)
-            # Grab 3x3 average and normalize
-            glob11 = np.mean(cube11.reshape(1000,9),axis=1)
-            glob11 = glob11/np.max(glob11)
-            z = np.column_stack((loc11,glob11))
-            # Append to arrays
-            out_arr.append(z)
-            out_y.append(nComps[i])
+    hdu.writeto(output_dir + '/random_cube_NH3_{0}_'.format(lineID)
+                  + '{0}'.format(i).zfill(nDigits)
+                  + '.fits',
+                  overwrite=True)
 
-    if ml_output:
-        out_y1 = np.where(np.array(out_y)==1, 1, 0)
-        out_y2 = np.where(np.array(out_y)==0, 1, 0)
-        out_y3 = np.where(np.array(out_y)==2, 1, 0)
-        with h5py.File('nh3_three_class.h5', 'w') as hf:
-	          hf.create_dataset('data', data=np.array(out_arr))
-	          hf.close()
-        with h5py.File('labels_nh3_three_class.h5', 'w') as hf:
-	          hf.create_dataset('data', data=np.column_stack((out_y1, out_y2, out_y3)))
-	          hf.close()
+
 
 if __name__ == '__main__':
     print(sys.argv)
