@@ -9,12 +9,15 @@ class TestResults:
 
     def __init__(self, results_table):
         self.table = Table.read(results_table, format='ascii')
-        #self.table['true_vsep'] = np.abs(self.table['VLSR1'] - self.table['VLSR2'])
-        self.table['true_vsep'] = np.abs(self.table['VLSR1'] - self.table['VLSR2'])
-        self.table['snr'] = self.table['TMAX']/self.table['RMS']
-        #self.true_vsep = np.abs(self.table['VLSR1'] - self.table['VLSR2'])
         self.mask_2v_good = self.table['NCOMP'] == 2
         self.is2compFit = self.table['NCOMP_FIT'] == 2
+
+        self.table['true_vsep'] = np.abs(self.table['VLSR1'] - self.table['VLSR2'])
+        self.table['snr'] = self.table['TMAX']/self.table['RMS']
+        self.table['sig_min'] = np.nanmin(np.array([self.table['SIG1'], self.table['SIG2']]), axis=0)
+        self.table['sig_max'] = np.nanmax(np.array([self.table['SIG1'], self.table['SIG2']]), axis=0)
+        self.table['sig_ratio'] = self.table['sig_min']/self.table['sig_max']
+
 
     def plot_cmatrix(self, **kwargs):
         if kwargs is None:
@@ -47,6 +50,41 @@ class TestResults:
 
         plot_success_rate(X[mask], Y[mask], bins, **kwargs)#linestyle='-', lw=3)
 
+
+    def plot_success_rate_wZBins(self, X_Key, Z_Key, bin_edges, bins=10, qname="", **kwargs):
+
+        if kwargs['ax'] is None:
+            fig, kwargs['ax'] = plt.subplots(1, 1, figsize=(6, 4))
+        ax = kwargs['ax']
+
+        edges = bin_edges
+        val = self.table[Z_Key]
+
+        # first bin
+        mask = np.logical_and(self.mask_2v_good, val < edges[0])
+        self.plot_success_rate(X_Key, mask, bins, **kwargs)
+        legtext = ["{0} < {1}".format(qname, bin_edges[0])]
+
+        # middle bins
+        mid_edges = bin_edges[:-1]
+        if len(mid_edges) > 0:
+            for i in range(len(mid_edges)):
+                mask = np.logical_and(self.mask_2v_good, val > edges[i])
+                mask = np.logical_and(mask, val < edges[i + 1])
+                self.plot_success_rate(X_Key, mask, bins, **kwargs)
+                legtext.append("{1} < {0} < {2}".format(qname, edges[i], edges[i + 1]))
+
+        # last bin
+        mask = np.logical_and(self.mask_2v_good, val > edges[-1])
+        self.plot_success_rate(X_Key, mask, bins, **kwargs)
+        legtext.append("{0} > {1}".format(qname, edges[-1]))
+
+        # ax.set_title('Identifying 2 components')
+        ax.set_ylabel('Fraction of True Postives')
+        ax.set_xlabel('True $\Delta \mathrm{v}_\mathrm{LSR}$ (km s$^{-1}$)')
+
+        if qname is not "":
+            ax.legend(legtext, frameon=False)
 
 
 #======================================================================================================================#
