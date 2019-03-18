@@ -9,7 +9,10 @@ class TestResults:
 
     def __init__(self, results_table):
         self.table = Table.read(results_table, format='ascii')
-        self.true_vsep = np.abs(self.table['VLSR1'] - self.table['VLSR2'])
+        #self.table['true_vsep'] = np.abs(self.table['VLSR1'] - self.table['VLSR2'])
+        self.table['true_vsep'] = np.abs(self.table['VLSR1'] - self.table['VLSR2'])
+        self.table['snr'] = self.table['TMAX']/self.table['RMS']
+        #self.true_vsep = np.abs(self.table['VLSR1'] - self.table['VLSR2'])
         self.mask_2v_good = self.table['NCOMP'] == 2
         self.is2compFit = self.table['NCOMP_FIT'] == 2
 
@@ -25,6 +28,24 @@ class TestResults:
             kwargs['normalize'] = True
 
         plot_cmatrix_wrapper(self.table['NCOMP'], self.table['NCOMP_FIT'], **kwargs)
+
+
+    def plot_success_rate(self, X_Key, mask=None, bins=10, linestyle=None, lw=None, **kwargs):
+
+        if linestyle is None:
+            kwargs['linestyle'] = '-'
+        if lw is None:
+            kwargs['lw'] = 3
+
+        X = self.table[X_Key]
+        Y = self.is2compFit
+
+        if mask is None:
+            mask = self.mask_2v_good
+        else:
+            mask = np.logical_and(self.mask_2v_good, mask)
+
+        plot_success_rate(X[mask], Y[mask], bins, **kwargs)#linestyle='-', lw=3)
 
 
 
@@ -115,7 +136,7 @@ def plot_success_rate(X, isTruePos, nbins=30, range=None, ax=None, **kwargs):
     from scipy.stats import binned_statistic
 
     # mean value of isTruePos (boolean) is the fraction of true postive id's out of all the id's
-    mean = binned_statistic(x=X, values=isTruePos, statistic=np.nanmean, bins=nbins, range=range)
+    mean = binned_statistic(x=X.copy(), values=isTruePos.copy(), statistic=np.nanmean, bins=nbins, range=range)
 
     bin_edges = mean.bin_edges
     bin_width = (bin_edges[1] - bin_edges[0])
