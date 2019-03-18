@@ -23,8 +23,11 @@ class TestResults:
         self.table['sig_max'] = np.nanmax(np.array([self.table['SIG1'], self.table['SIG2']]), axis=0)
         self.table['sig_ratio'] = self.table['sig_min']/self.table['sig_max']
 
-        self.table['true_vErr1'] = self.table['VLSR1'] - self.table['VLSR1_FIT']
-        self.table['true_vErr2'] = self.table['VLSR2'] - self.table['VLSR2_FIT']
+        # sort the two components
+        self.sort_2comps()
+
+        #self.table['true_vErr1'] = self.table['VLSR1'] - self.table['VLSR1_FIT']
+        #self.table['true_vErr2'] = self.table['VLSR2'] - self.table['VLSR2_FIT']
 
 
     def plot_cmatrix(self, **kwargs):
@@ -96,14 +99,39 @@ class TestResults:
 
 
     def plot_error(self, X_Key, Y_Key, mask=None, range=None, ax=None, bins=30):
-        X = self.table[X_Key]
-        Y = self.table[Y_Key]
+        '''
+        Plot values specified in the X_Key, such as errors, as a function of  values specified in the Y_Key
+        X_Key and Y_Key can be lists of the same length and their values will be binned together
+        :param X_Key:
+        :param Y_Key:
+        :param mask:
+        :param range:
+        :param ax:
+        :param bins:
+        :return:
+        '''
 
-        if mask is not None:
-            X = X[mask]
-            Y = Y[mask]
+        XList = []
+        YList = []
 
-        plot_err(X.ravel(), Y.ravel(), Err=None, bins=bins, range=range, ax=ax, title=None)
+        if isinstance(X_Key, str):
+            X_Key = [X_Key]
+
+        if isinstance(Y_Key, str):
+            Y_Key = [Y_Key]
+
+        for xkey, ykey in zip(X_Key, Y_Key):
+            X = self.table[xkey]
+            Y = self.table[ykey]
+
+            if mask is not None:
+                X = X[mask]
+                Y = Y[mask]
+
+            XList.append(X)
+            YList.append(Y)
+
+        plot_err(np.array(XList).ravel(), np.array(YList).ravel(), Err=None, bins=bins, range=range, ax=ax, title=None)
 
 
     def sort_2comps(self):
@@ -118,7 +146,6 @@ class TestResults:
         diffVLSR2 = np.abs(VLSR_t[0] - VLSR_m[1])
 
         swapmask = diffVLSR1 > diffVLSR2
-        print swapmask.shape
         # only apply to where two component true postives exists
         mask = np.logical_and(self.mask_2v_good, self.is2compFit)
         swapmask[~mask] = False
