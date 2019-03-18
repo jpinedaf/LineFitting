@@ -8,6 +8,8 @@ import numpy as np
 from astropy.io import fits
 from astropy.utils.console import ProgressBar
 from astropy import log
+from astropy import units as u
+from astropy import constants
 log.setLevel('ERROR')
 
 
@@ -19,11 +21,7 @@ def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cube
 
     for linename in linenames:
         # generate spectral axis for each ammonia lines
-        xarr = spaxis((np.linspace(-500, 499, 1000) * 5.72e-6
-                       + nh3con.freq_dict[linename] / 1e9),
-                      unit='GHz',
-                      refX=nh3con.freq_dict[linename] / 1e9,
-                      velocity_convention='radio', refX_unit='GHz')
+        xarr = generate_xarr(linename)
         xarrList.append(xarr)
 
     # generate random parameters for nCubes
@@ -102,6 +100,16 @@ def generate_parameters(nCubes, random_seed=None, fix_vlsr=True):
 
     return nComps, Temp, Width, Voff, logN
 
+
+def generate_xarr(linename):
+    # generate SpectroscopicAxis objects
+    channelwidth = (5.72 * u.kHz / (nh3con.freq_dict[linename] * u.Hz)) * constants.c
+
+    xarr = spaxis(np.arange(-500, 500) * channelwidth,
+                  unit='GHz',
+                  refX=nh3con.freq_dict[linename] / 1e9,
+                  velocity_convention='radio', refX_unit='GHz')
+    return xarr
 
 
 def make_cube(nComps, nBorder, xarr, Temp, Width, Voff, logN, gradX, gradY, noise_rms):

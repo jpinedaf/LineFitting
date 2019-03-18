@@ -44,7 +44,7 @@ def f(nCubes, nComp, i, nBorder, T, W, V, N, grdX, grdY, noise_rms, linename, ou
 
     # generating SpectroscopicAxis objects here may be a little inefficient, but it's a work around to the pickling
     # error (i.e., PicklingError: Can't pickle <type 'function'>: attribute lookup __builtin__.function failed issue)
-    xarr = generate_xarr(linename)
+    xarr = testcubes.generate_xarr(linename)
     testcubes.make_and_write(nCubes, nComp, i, nBorder, xarr, T, W, V, N, grdX, grdY, noise_rms, linename, output_dir)
 
 
@@ -52,7 +52,7 @@ def f_star(paras):
     """Convert `f([a,b,...])` to `f(a,b,...)` call."""
     return f(*paras)
 
-
+'''
 def generate_xarr(linename):
     # generate SpectroscopicAxis objects
     xarr = spaxis((np.linspace(-500, 499, 1000) * 5.72e-6
@@ -61,6 +61,7 @@ def generate_xarr(linename):
                   refX=nh3con.freq_dict[linename] / 1e9,
                   velocity_convention='radio', refX_unit='GHz')
     return xarr
+'''
 
 
 
