@@ -2,6 +2,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 from sklearn.metrics import confusion_matrix
 from astropy.table import Table
+from scipy.stats import binned_statistic
+from astropy.stats import mad_std
 
 #======================================================================================================================#
 
@@ -9,6 +11,7 @@ class TestResults:
 
     def __init__(self, results_table):
         self.table = Table.read(results_table, format='ascii')
+        self.mask_1v_truepos = np.logical_and(self.table['NCOMP'] == 1, self.table['NCOMP_FIT'] == 1)
         self.mask_2v_good = self.table['NCOMP'] == 2
         self.is2compFit = self.table['NCOMP_FIT'] == 2
 
@@ -17,6 +20,7 @@ class TestResults:
         self.table['sig_min'] = np.nanmin(np.array([self.table['SIG1'], self.table['SIG2']]), axis=0)
         self.table['sig_max'] = np.nanmax(np.array([self.table['SIG1'], self.table['SIG2']]), axis=0)
         self.table['sig_ratio'] = self.table['sig_min']/self.table['sig_max']
+        self.table['true_vErr'] = self.table['VLSR1'] - self.table['VLSR1_FIT']
 
 
     def plot_cmatrix(self, **kwargs):
@@ -85,6 +89,16 @@ class TestResults:
 
         if qname is not "":
             ax.legend(legtext, frameon=False)
+
+    def plot_error(self, X_Key, Y_Key, mask=None, range=None, ax=None):
+        X = self.table[X_Key]
+        Y = self.table[Y_Key]
+
+        if mask is not None:
+            X = X[mask]
+            Y = Y[mask]
+
+        plot_err(X, Y, Err=None, bins=30, range=range, ax=ax, title=None)
 
 
 #======================================================================================================================#
@@ -171,7 +185,6 @@ def plot_success_rate(X, isTruePos, nbins=30, range=None, ax=None, **kwargs):
     :param kwargs:
     :return:
     """
-    from scipy.stats import binned_statistic
 
     # mean value of isTruePos (boolean) is the fraction of true postive id's out of all the id's
     mean = binned_statistic(x=X.copy(), values=isTruePos.copy(), statistic=np.nanmean, bins=nbins, range=range)
@@ -187,4 +200,62 @@ def plot_success_rate(X, isTruePos, nbins=30, range=None, ax=None, **kwargs):
 
     return ax
 
+
+def plot_medNStd(X, Y, bins=30, range=None, ax=None, title=None):
+
+    med = binned_statistic(x=X, values=Y, statistic='median', bins=bins, range=range)
+    std = binned_statistic(x=X, values=Y, statistic=mad_std, bins=bins, range=range)
+
+    ax = plot_fillscat(med.statistic, std.statistic, std.bin_edges, ax=ax, title=title)
+    return ax
+
+
+def plot_err(X, Y, Err=None, bins=30, range=None, ax=None, title=None):
+
+    if ax is None:
+        ax = plt.subplot(1, 1, 1)
+
+    std = binned_statistic(x=X, values=Y, statistic=mad_std, bins=bins, range=range)
+
+    bin_edges = std.bin_edges
+    bin_width = (bin_edges[1] - bin_edges[0])
+    bin_centers = bin_edges[1:] - bin_width / 2
+
+    ax.plot(bin_centers, std.statistic, '-o', lw=3)
+    legend = ["True Error (MAD_STD)"]
+
+    if Err is not None:
+        err = binned_statistic(x=X, values=Err, statistic='median', bins=bins, range=range)
+        ax.plot(bin_centers, err.statistic, '-o', lw=3)
+        legend.append("Estimated Error")
+
+    ax.set_ylabel('Error')
+    ax.set_xlabel('SNR')
+    ax.legend(legend, frameon=False)
+    if title is not None:
+        ax.set_title(title)
+
+    return ax
+
+#======================================================================================================================#
+# generic plotting functions
+
+def plot_fillscat(med, std, bin_edges, ax=None, title=None):
+    if ax is None:
+        ax = plt.subplot(1, 1, 1)
+
+    prop_cycle = plt.rcParams['axes.prop_cycle']
+    colors = prop_cycle.by_key()['color']
+
+    bin_width = (bin_edges[1] - bin_edges[0])
+    bin_centers = bin_edges[1:] - bin_width / 2
+
+    ax.plot(bin_centers, med, '-o', lw=3, color='0.5')
+    ax.fill_between(bin_centers, med - std, med + std, alpha=0.25, color=colors[1])
+    ax.set_ylabel('True - fit')
+    ax.set_xlabel('SNR')
+    if title is not None:
+        ax.set_title(title)
+
+    return ax
 
