@@ -30,7 +30,7 @@ class TestResults:
         #self.table['true_vErr2'] = self.table['VLSR2'] - self.table['VLSR2_FIT']
 
 
-    def plot_cmatrix(self, **kwargs):
+    def plot_cmatrix(self, mask = None, **kwargs):
         if kwargs is None:
             kwargs = {}
 
@@ -41,7 +41,56 @@ class TestResults:
         if not 'normalize' in kwargs:
             kwargs['normalize'] = True
 
-        plot_cmatrix_wrapper(self.table['NCOMP'], self.table['NCOMP_FIT'], **kwargs)
+        if mask is None:
+            plot_cmatrix_wrapper(self.table['NCOMP'], self.table['NCOMP_FIT'], **kwargs)
+        else:
+            plot_cmatrix_wrapper(self.table['NCOMP'][mask], self.table['NCOMP_FIT'][mask], **kwargs)
+
+
+    def plot_cmatrix_wZBins(self, Z_Key, bin_edges, qname="", ncols=2, figsize=(10, 8), **kwargs):
+
+        if not 'fig' in kwargs:
+            kwargs['fig'] = plt.figure(figsize=figsize)
+
+        fig = kwargs['fig']
+
+        edges = bin_edges
+        val = self.table[Z_Key]
+
+        n_plot = len(bin_edges) + 1
+        if ncols != 2:
+            ncols = int(np.sqrt(n_plot))
+
+        nrows = n_plot/ncols
+        if n_plot%ncols !=0:
+            nrows = nrows + 1
+
+        classes = ["1 comp", "2 comp"]
+        #title = 'All pixels'
+        kwargs2 = {'classes': classes, 'normalize': True}#, 'title': title}
+
+        # first bin
+        mask = val < edges[0]
+        kwargs2['title'] = "{0} < {1}".format(qname, bin_edges[0])
+        self.plot_cmatrix(mask, ax=fig.add_subplot(nrows, ncols, 1), **kwargs2)
+
+        # middle bins
+        mid_edges = bin_edges[:-1]
+        if len(mid_edges) > 0:
+            for i in range(len(mid_edges)):
+                kwargs2['title'] = "{1} < {0} < {2}".format(qname, edges[i], edges[i + 1])
+                mask = val > edges[i]
+                mask = np.logical_and(mask, val < edges[i + 1])
+                self.plot_cmatrix(mask, ax=fig.add_subplot(nrows, ncols, i+2), **kwargs2)
+
+        # last bin
+        kwargs2['title'] = "{0} > {1}".format(qname, edges[-1])
+        mask = val > edges[-1]
+        self.plot_cmatrix(mask, ax=fig.add_subplot(nrows, ncols, n_plot), **kwargs2)
+
+        fig.subplots_adjust(wspace=0.1, hspace=0.7)
+
+
 
 
     def plot_success_rate(self, X_Key, mask=None, bins=10, linestyle=None, lw=None, **kwargs):
