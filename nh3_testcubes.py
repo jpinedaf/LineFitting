@@ -53,7 +53,7 @@ def generate_gradients(nCubes, random_seed=None):
     if random_seed:
         np.random.seed(random_seed)
     # scaling for the temp, sigma, voff, and logN parameters
-    scale = np.array([[0.2, 0.1, 0.5, 0.01]])
+    scale = np.array([[0.2, 0.1, 0.1, 0.01]])
     # 0.5 km/s/pix is about 39.7 km/s/pc at 260pc away at 10"/pix
     gradX1 = np.random.randn(nCubes, 4) * scale
     gradY1 = np.random.randn(nCubes, 4) * scale
