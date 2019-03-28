@@ -103,7 +103,9 @@ def generate_parameters(nCubes, random_seed=None, fix_vlsr=True):
 
 def generate_xarr(linename):
     # generate SpectroscopicAxis objects
-    channelwidth = (5.72 * u.kHz / (nh3con.freq_dict[linename] * u.Hz)) * constants.c
+    # the -1.0 term in the end is to insure the channel is in the increasing order in frequency space, consistent
+    # with GAS data
+    channelwidth = (5.72 * u.kHz / (nh3con.freq_dict[linename] * u.Hz)) * constants.c * -1.0
 
     xarr = spaxis(np.arange(-500, 500) * channelwidth,
                   unit='GHz',
