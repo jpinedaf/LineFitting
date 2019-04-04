@@ -19,6 +19,8 @@ class TestResults:
 
         self.table['true_vsep'] = np.abs(self.table['VLSR1'] - self.table['VLSR2'])
         self.table['snr'] = self.table['TMAX']/self.table['RMS']
+        self.table['snr-1'] = self.table['TMAX-1'] / self.table['RMS']
+        self.table['snr-2'] = self.table['TMAX-2'] / self.table['RMS']
         self.table['sig_min'] = np.nanmin(np.array([self.table['SIG1'], self.table['SIG2']]), axis=0)
         self.table['sig_max'] = np.nanmax(np.array([self.table['SIG1'], self.table['SIG2']]), axis=0)
         self.table['sig_ratio'] = self.table['sig_min']/self.table['sig_max']
@@ -205,6 +207,9 @@ class TestResults:
         sortList.append([self.table['SIG1_FIT'], self.table['SIG2_FIT']])
         sortList.append([(self.table['eVLSR1_FIT']), (self.table['eVLSR2_FIT'])])
         sortList.append([(self.table['eSIG1_FIT']), (self.table['eSIG2_FIT'])])
+        sortList.append([(self.table['TMAX-1']), (self.table['TMAX-2'])])
+        sortList.append([(self.table['snr-1']), (self.table['snr-2'])])
+
         #sortList.append()
 
         for i, q in enumerate(sortList):
