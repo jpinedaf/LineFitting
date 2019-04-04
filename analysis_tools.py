@@ -21,15 +21,16 @@ class TestResults:
         self.table['snr'] = self.table['TMAX']/self.table['RMS']
         self.table['snr-1'] = self.table['TMAX-1'] / self.table['RMS']
         self.table['snr-2'] = self.table['TMAX-2'] / self.table['RMS']
+
         self.table['sig_min'] = np.nanmin(np.array([self.table['SIG1'], self.table['SIG2']]), axis=0)
         self.table['sig_max'] = np.nanmax(np.array([self.table['SIG1'], self.table['SIG2']]), axis=0)
         self.table['sig_ratio'] = self.table['sig_min']/self.table['sig_max']
 
-        # sort the two components
-        self.sort_2comps()
+        self.table['snr_min'] = np.nanmin(np.array([self.table['snr-1'], self.table['snr-2']]), axis=0)
+        self.table['snr_max'] = np.nanmax(np.array([self.table['snr-1'], self.table['snr-2']]), axis=0)
 
-        #self.table['true_vErr1'] = self.table['VLSR1'] - self.table['VLSR1_FIT']
-        #self.table['true_vErr2'] = self.table['VLSR2'] - self.table['VLSR2_FIT']
+        # sort the two components (true errors will be calculated following the sorting)
+        self.sort_2comps()
 
 
     def plot_cmatrix(self, mask = None, **kwargs):
@@ -342,16 +343,13 @@ def plot_err(X, Y, Err=None, bins=30, range=None, ax=None, title=None):
     bin_centers = bin_edges[1:] - bin_width / 2
 
     ax.plot(bin_centers, std.statistic, '-o', lw=3)
-    legend = ["True Error (MAD_STD)"]
 
     if Err is not None:
         err = binned_statistic(x=X, values=Err, statistic='median', bins=bins, range=range)
         ax.plot(bin_centers, err.statistic, '-o', lw=3)
-        legend.append("Estimated Error")
 
     ax.set_ylabel('Error')
     ax.set_xlabel('SNR')
-    ax.legend(legend, frameon=False)
     if title is not None:
         ax.set_title(title)
 
