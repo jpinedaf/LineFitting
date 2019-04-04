@@ -28,6 +28,7 @@ class TestResults:
 
         self.table['snr_min'] = np.nanmin(np.array([self.table['snr-1'], self.table['snr-2']]), axis=0)
         self.table['snr_max'] = np.nanmax(np.array([self.table['snr-1'], self.table['snr-2']]), axis=0)
+        self.table['snr_ratio'] = self.table['snr_min'] / self.table['snr_max']
 
         # sort the two components (true errors will be calculated following the sorting)
         self.sort_2comps()
