@@ -349,7 +349,7 @@ def plot_err(X, Y, Err=None, bins=30, range=None, ax=None, title=None):
         ax.plot(bin_centers, err.statistic, '-o', lw=3)
 
     ax.set_ylabel('Error')
-    ax.set_xlabel('SNR')
+    #ax.set_xlabel('SNR')
     if title is not None:
         ax.set_title(title)
 
