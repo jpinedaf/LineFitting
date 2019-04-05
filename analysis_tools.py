@@ -55,6 +55,10 @@ class TestResults:
 
         if not 'fig' in kwargs:
             kwargs['fig'] = plt.figure(figsize=figsize)
+            # if no fig is given, return the figure object
+            returnFig = True
+        else:
+            returnFig = False
 
         fig = kwargs['fig']
 
@@ -93,6 +97,9 @@ class TestResults:
         self.plot_cmatrix(mask, ax=fig.add_subplot(nrows, ncols, n_plot), **kwargs2)
 
         fig.subplots_adjust(wspace=0.1, hspace=0.7)
+
+        if returnFig:
+            return fig
 
 
 
