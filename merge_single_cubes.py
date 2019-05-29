@@ -2,17 +2,19 @@ import glob
 from astropy.io import fits
 import numpy as np
 
-file_11 = glob.glob('random_cubes/*11*fits')
-n_spec = len(file_11)
+#file_11 = glob.glob('random_cubes/*11*fits')
+n_spec = 1000 #len(file_11)
 
-hd11 = fits.getheader( file_11[0])
-hd22 = fits.getheader( file_11[0].replace('NH3_11','NH3_22'))
+f_test='random_cubes/random_cube_NH3_11_000.fits'
+hd11 = fits.getheader( f_test)
+hd22 = fits.getheader( f_test.replace('NH3_11','NH3_22'))
 cube11 = np.zeros( (hd11['NAXIS3'], 1, n_spec))
 cube22 = np.zeros( (hd22['NAXIS3'], 1, n_spec))
 rms11 = np.zeros( (1, n_spec))
 rms22 = np.zeros( (1, n_spec))
 params = np.zeros( ( 12, 1, n_spec))
 n_comp = np.zeros( ( 1, n_spec))
+T_max = np.zeros( ( 2, 1, n_spec))
 
 hd11['NAXIS1'] = n_spec
 hd22['NAXIS1'] = n_spec
@@ -20,14 +22,19 @@ hd11['NAXIS2'] = 1
 hd22['NAXIS2'] = 1
 
 for i in range(n_spec):
-    file_22_i=file_11[i].replace('NH3_11','NH3_22')
-    data11_i, hd11_i = fits.getdata( file_11[i], header=True)
+    file_11_i='random_cubes/random_cube_NH3_11_{0:03d}.fits'.format(i)
+    file_22_i='random_cubes/random_cube_NH3_22_{0:03d}.fits'.format(i)
+    #
+    data11_i, hd11_i = fits.getdata( file_11_i, header=True)
     data22_i, hd22_i = fits.getdata( file_22_i, header=True)
     cube11[:,0,i] = data11_i[:,1,1]
     cube22[:,0,i] = data22_i[:,1,1]
     rms11[0,i] = hd11_i['RMS']
     rms22[0,i] = hd22_i['RMS']
     n_comp[0,i] = hd11_i['NCOMP']
+    #
+    T_max[0,0,i] = hd11_i['TMAX-1']
+    T_max[1,0,i] = hd11_i['TMAX-2']
     #  Tk, Tex, log(N), sigma_v, v_lsr, f_ortho
     # Tk
     params[0+0,0,i] = hd11_i['TKIN1']
@@ -66,3 +73,7 @@ fits.writeto('random_cubes/combined_NH3_N_par.fits', n_comp, hd11_2d, overwrite=
 hd11_2d['NAXIS'] = 3
 hd11_2d['NAXIS3'] = 12
 fits.writeto('random_cubes/combined_NH3_params.fits', params, hd11_2d, overwrite=True)
+
+hd11_2d['NAXIS3'] = 2
+fits.writeto('random_cubes/combined_NH3_Tmaxs.fits', T_max, hd11_2d, overwrite=True)
+

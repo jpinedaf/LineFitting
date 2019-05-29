@@ -30,4 +30,13 @@ peak_map[ 0, 1] = (npeaks_map[ n_comp_in == 1] == 2).sum()*(1.0 / (n_comp_in == 
 peak_map[ 1, 0] = (npeaks_map[ n_comp_in == 2] == 1).sum()*(1.0 / (n_comp_in == 2).sum())
 peak_map[ 1, 1] = (npeaks_map[ n_comp_in == 2] == 2).sum()*(1.0 / (n_comp_in == 2).sum())
 
-at.plot_confusion_matrix(peak_mapi, ['1 comp', '2 comp'])
+at.plot_confusion_matrix(peak_map, ['1 comp', '2 comp'])
+
+par = fits.getdata('Bayesian/combined_NH3_params.fits')
+
+fit1 = fits.getdata('Bayesian/combined_NH3-mle-x1.fits')
+fit2 = fits.getdata('Bayesian/combined_NH3-mle-x2.fits')
+
+
+plt.scatter( 
+
