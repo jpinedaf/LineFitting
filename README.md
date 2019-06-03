@@ -13,7 +13,7 @@ Tests of line fitting algorithms, with a focus on different strategies for multi
 ## GAS Test Cubes
 A test set of 10,000 cubes are generated via `nh3_testcubes.py` for a benchmark comparison between different line-fitting algorithms. A synthetic ammonia spectrum modelled by either one or two velocity slabs is generated at the central pixel of each test cube. The remainder pixels in the cube are filled with models nearly identical to that of the center pixel, differ only by a small velocity offset for individual velocity slabs.
 
-Comparison between different line-fitting algorithms are performed statically on the central pixel of the cubes.
+Peformance of the line-fitting algorithms are compared against one another statically based on their fits to the central pixel of the cubes. Default random seed for the cube generation is set to `42` to accommodate further needs to make spectrum-to-spectrum comparisons.
 
 ### Distributions of the Test Set Parameters
 The physical parameters used to generate the test cubes are randomly drawn from the following distributions for each velocity slap:
@@ -25,7 +25,7 @@ The physical parameters used to generate the test cubes are randomly drawn from 
   - Thermal linewidth: `0.08` km s<sup>-1</sup>
   - Non-thermal linewidth: log-normally distributed in the natural log space. The distribution has an 1-sigma range of `[0.1, 1.6)` log(km s<sup>-1</sup>)
 * Column Density:
-  - Uniformly distributed in the log<sub>10</sub> space in the range of `[13, 14,5)` log(cm<sup>-2</sup>).
+  - Uniformly distributed in the log<sub>10</sub> space in the range of `[13, 14.5)` log(cm<sup>-2</sup>).
 * Kinetic temperature:
   - Uniform distribution in the range of `[8, 25)` K
 
