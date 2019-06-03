@@ -52,16 +52,6 @@ def f_star(paras):
     """Convert `f([a,b,...])` to `f(a,b,...)` call."""
     return f(*paras)
 
-'''
-def generate_xarr(linename):
-    # generate SpectroscopicAxis objects
-    xarr = spaxis((np.linspace(-500, 499, 1000) * 5.72e-6
-                   + nh3con.freq_dict[linename] / 1e9),
-                  unit='GHz',
-                  refX=nh3con.freq_dict[linename] / 1e9,
-                  velocity_convention='radio', refX_unit='GHz')
-    return xarr
-'''
 
 
 
