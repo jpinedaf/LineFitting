@@ -14,7 +14,7 @@ log.setLevel('ERROR')
 
 
 
-def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cubes', random_seed=None,
+def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cubes', random_seed=42,
                    linenames=['oneone', 'twotwo']):
 
     xarrList = []
