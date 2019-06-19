@@ -23,7 +23,7 @@ The physical parameters used to generate the test cubes are randomly drawn from 
 * Linewidth:
   - Quadrature-sum of the thermal and the non-thermal linewidths
   - Thermal linewidth: `0.08` km s<sup>-1</sup>
-  - Non-thermal linewidth: log-normally distributed in the natural log space. The distribution has an 1-sigma range of `[0.1, 1.6)` log(km s<sup>-1</sup>)
+  - Non-thermal linewidth: log-normally distributed in the natural log space. The distribution has an 1-sigma range of `[-3.8,  -0.8)` log(km s<sup>-1</sup>) in the natural log space.
 * Column Density:
   - Uniformly distributed in the log<sub>10</sub> space in the range of `[13, 14.5)` log(cm<sup>-2</sup>).
 * Kinetic temperature:
