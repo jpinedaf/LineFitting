@@ -14,7 +14,7 @@ log.setLevel('ERROR')
 
 
 
-def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cubes', random_seed=None,
+def generate_cubes(nCubes=100, nBorder=1, noise_rms=0.1, output_dir='random_cubes', random_seed=42,
                    linenames=['oneone', 'twotwo']):
 
     xarrList = []
@@ -128,7 +128,7 @@ def make_cube(nComps, nBorder, xarr, Temp, Width, Voff, logN, gradX, gradY, nois
 
         for j in range(nComps):
             # define parameters
-            T = Temp[j] * (1 + gradX[j][0] * (xx - 1) + gradY[j][0] * (yy - 1)) + 5
+            T = Temp[j] * (1 + gradX[j][0] * (xx - 1) + gradY[j][0] * (yy - 1))
             if T < 2.74:
                 T = 2.74
             W = np.abs(Width[j] * (1 + gradX[j][1] * (xx - 1) + gradY[j][1] * (yy - 1)))
