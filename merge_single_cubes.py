@@ -3,9 +3,9 @@ from astropy.io import fits
 import numpy as np
 
 #file_11 = glob.glob('random_cubes/*11*fits')
-n_spec = 1000 #len(file_11)
+n_spec = 20000 #len(file_11)
 
-f_test='random_cubes/random_cube_NH3_11_000.fits'
+f_test='random_cubes/random_cube_NH3_11_00000.fits'
 hd11 = fits.getheader( f_test)
 hd22 = fits.getheader( f_test.replace('NH3_11','NH3_22'))
 cube11 = np.zeros( (hd11['NAXIS3'], 1, n_spec))
@@ -22,8 +22,8 @@ hd11['NAXIS2'] = 1
 hd22['NAXIS2'] = 1
 
 for i in range(n_spec):
-    file_11_i='random_cubes/random_cube_NH3_11_{0:03d}.fits'.format(i)
-    file_22_i='random_cubes/random_cube_NH3_22_{0:03d}.fits'.format(i)
+    file_11_i='random_cubes/random_cube_NH3_11_{0:05d}.fits'.format(i)
+    file_22_i='random_cubes/random_cube_NH3_22_{0:05d}.fits'.format(i)
     #
     data11_i, hd11_i = fits.getdata( file_11_i, header=True)
     data22_i, hd22_i = fits.getdata( file_22_i, header=True)
@@ -52,8 +52,8 @@ for i in range(n_spec):
     params[4+0,0,i] = hd11_i['VLSR1']
     params[4+6,0,i] = hd11_i['VLSR2']
 
-fits.writeto('random_cubes/combined_NH3_11.fits', cube11, hd11, overwrite=True)
-fits.writeto('random_cubes/combined_NH3_22.fits', cube22, hd22, overwrite=True)
+fits.writeto('random_cubes/combined_NH3_11_n{0}.fits'.format(n_spec), cube11, hd11, overwrite=True)
+fits.writeto('random_cubes/combined_NH3_22_n{0}.fits'.format(n_spec), cube22, hd22, overwrite=True)
 
 hd11_2d = hd11.copy()
 hd22_2d = hd22.copy()
@@ -66,14 +66,14 @@ for key_i in key_list:
 hd11_2d['NAXIS'] = 2
 hd22_2d['NAXIS'] = 2
 
-fits.writeto('random_cubes/combined_NH3_11_rms.fits', rms11, hd11_2d, overwrite=True)
-fits.writeto('random_cubes/combined_NH3_22_rms.fits', rms22, hd22_2d, overwrite=True)
+fits.writeto('random_cubes/combined_NH3_11_rms_n{0}.fits'.format(n_spec), rms11, hd11_2d, overwrite=True)
+fits.writeto('random_cubes/combined_NH3_22_rms_n{0}.fits'.format(n_spec), rms22, hd22_2d, overwrite=True)
 
-fits.writeto('random_cubes/combined_NH3_N_par.fits', n_comp, hd11_2d, overwrite=True)
+fits.writeto('random_cubes/combined_NH3_N_par_n{0}.fits'.format(n_spec), n_comp, hd11_2d, overwrite=True)
 hd11_2d['NAXIS'] = 3
 hd11_2d['NAXIS3'] = 12
-fits.writeto('random_cubes/combined_NH3_params.fits', params, hd11_2d, overwrite=True)
+fits.writeto('random_cubes/combined_NH3_params_n{0}.fits'.format(n_spec), params, hd11_2d, overwrite=True)
 
 hd11_2d['NAXIS3'] = 2
-fits.writeto('random_cubes/combined_NH3_Tmaxs.fits', T_max, hd11_2d, overwrite=True)
+fits.writeto('random_cubes/combined_NH3_Tmaxs_n{0}.fits'.format(n_spec), T_max, hd11_2d, overwrite=True)
 
